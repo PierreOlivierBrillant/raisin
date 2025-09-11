@@ -1,0 +1,286 @@
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+body {
+  display: block;
+}
+
+.app-shell {
+  min-height: 100vh;
+  width: 100%;
+  background: #f9fafb;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+.app-header {
+  width: 100%;
+  padding: 1rem 2rem 0.25rem; /* réduit la hauteur globale */
+  box-sizing: border-box;
+}
+.app-header h1 {
+  font-size: 1.65rem; /* plus compact */
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
+  line-height: 1.2; /* réduit la hauteur de ligne */
+  margin: 0 0 0.75rem; /* marge réduite */
+}
+
+.app-header h2 {
+  font-size: 1.05rem; /* plus petit */
+  font-weight: 400;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.25;
+  margin: 0 0 0.75rem; /* marge réduite */
+}
+
+.tabs {
+  display: flex;
+  width: 100%;
+  border-bottom: 2px solid #e5e7eb;
+  gap: 0.25rem;
+  padding: 0 2rem;
+  box-sizing: border-box;
+}
+.tab {
+  background: transparent;
+  border: 0;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  transition: color 0.2s;
+}
+.tab:focus,
+.tab:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.tab.active {
+  color: #2563eb;
+}
+.tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: #2563eb;
+}
+.tab:hover {
+  color: #374151;
+}
+.main-content {
+  flex: 1;
+  width: 100%;
+  margin: 1.5rem 0 0 0;
+  padding: 0 2rem 2rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.card {
+  background: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+.card-no-mb-desktop {
+  margin-bottom: 0;
+}
+@media (max-width: 768px) {
+  .card-no-mb-desktop {
+    margin-bottom: 1.5rem; /* conserver l'espacement sur mobile */
+  }
+}
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+  /* Masqué car non utilisé dans l'interface actuellement */
+  display: none;
+}
+.card-subtitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  transition: background-color 0.2s, opacity 0.2s, transform 0.15s;
+}
+.btn-compact {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.1;
+}
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+}
+.btn-success {
+  background: #059669;
+  color: #fff;
+}
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+}
+.btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  background: #fff;
+  color: #111827;
+  caret-color: #111827;
+  box-sizing: border-box; /* Empêche le dépassement horizontal */
+}
+.input::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+.form-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #374151;
+  margin: 0 0 0.35rem;
+}
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
+}
+
+.v-stack {
+  display: flex;
+  flex-direction: column;
+}
+.v-stack.sm {
+  gap: 0.6rem;
+}
+.v-stack.md {
+  gap: 1rem;
+}
+
+.badge {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+.badge-success {
+  background: #dcfce7;
+  color: #166534;
+}
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+.badge-error {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 0;
+  color: #6b7280;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.processing-state {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  text-align: center;
+}
+.spinner {
+  border: 2px solid #f3f4f6;
+  border-top: 2px solid #2563eb;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Template Editor */
+
+@media (max-width: 768px) {
+  .tabs {
+    flex-wrap: wrap;
+  }
+  .app-header h1 {
+    font-size: 1.4rem; /* encore plus compact sur mobile */
+    margin-bottom: 0.5rem;
+  }
+  .app-header h2 {
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  .te-graph {
+    height: 400px;
+  }
+}
+
+/* Utilitaire pour retirer la marge basse du dernier paragraphe */
+.no-last-mb p:last-child {
+  margin-bottom: 0 !important;
+}
