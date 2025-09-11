@@ -1,7 +1,6 @@
 import React, { useRef } from "react";
 import { AlertCircle, CheckCircle, Download, Upload } from "lucide-react";
-import type { HierarchyTemplate } from "../../types/HierarchyTemplate";
-import type { StudentFolder } from "../../types/StudentFolder";
+import type { HierarchyTemplate, StudentFolder } from "../../types";
 import { zpStyles } from "./ZipProcessor.styles";
 
 interface ZipProcessorProps {

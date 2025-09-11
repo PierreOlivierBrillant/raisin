@@ -1,69 +1,66 @@
-# React + TypeScript + Vite
+# Raisin
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Application React + TypeScript (Vite) permettant :
 
-Currently, two official plugins are available:
+- de définir un modèle hiérarchique de dossiers/fichiers
+- d’exporter / importer ce modèle en YAML
+- d’analyser des archives ZIP (structure simulée pour l’instant)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Scripts
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev       # serveur de développement (HMR)
+npm run build     # build production (pré-lint + tsc + vite)
+npm run preview   # prévisualisation du build
+npm run lint      # vérification ESLint
+npm run lint:fix  # vérification + corrections automatiques
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Le script `prebuild` lance automatiquement `npm run lint` avant le build.
+
+## Linting
+
+Configuration basée sur:
+
+- @eslint/js (recommandé)
+- typescript-eslint (config recommandée)
+- react-hooks (recommended-latest)
+- react-refresh (vite)
+
+Améliorations possibles si besoin de règles plus strictes (type-aware) :
 
 ```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+// Exemple (extrait) pour eslint.config.js
+// ...
+// remplacer tseslint.configs.recommended par :
+...tseslint.configs.recommendedTypeChecked,
+// ou version stricte :
+...tseslint.configs.strictTypeChecked,
+// éventuellement stylistique :
+...tseslint.configs.stylisticTypeChecked,
 ```
+
+Veiller alors à ajouter `parserOptions.project` pointant vers `tsconfig.app.json` et `tsconfig.node.json`.
+
+## Types
+
+Barrel unique : `src/types/index.ts` (FileNode, HierarchyTemplate, CreateNodeOptions, YamlHierarchy, etc.).
+
+## Logique du modèle
+
+`TemplateEditor.logic.ts` contient les opérations pures :
+
+- création / mise à jour / suppression de nœuds
+- garantie de l’invariant racine (`ensureRootInvariant`)
+- sérialisation / désérialisation YAML (`toYamlHierarchy`, `fromYamlHierarchy`)
+
+## Pistes futures
+
+- Tests unitaires sur la logique de hiérarchie
+- Analyse réelle d’archives ZIP + scoring
+- Internationalisation de l’UI
+- Règles ESLint strict type-aware
+
+## Licence
+
+Projet privé (aucune licence explicite fournie pour l’instant).

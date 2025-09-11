@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { Settings, Upload } from "lucide-react";
 import { ZipProcessor } from "./ZipProcessor/ZipProcessor";
-import type { HierarchyTemplate } from "../types/HierarchyTemplate";
-import type { StudentFolder } from "../types/StudentFolder";
+import type { HierarchyTemplate, StudentFolder } from "../types";
 import "../styles/layout.css";
 import { TemplateEditor } from "./TemplateEditor/TemplateEditor";
 
