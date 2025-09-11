@@ -38,7 +38,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const simulationRef = useRef<d3.Simulation<GraphNode, undefined> | null>(
     null
   );
-  // Conserver la dernière version de onSelectNode pour éviter de rebâtir le graphe à chaque render
   const onSelectNodeRef = useRef(onSelectNode);
   useEffect(() => {
     onSelectNodeRef.current = onSelectNode;
@@ -50,47 +49,30 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     }
   }, []);
 
-  const recenterRoot = useCallback(
-    (soft: boolean = false) => {
-      if (
-        !svgRef.current ||
-        !simulationRef.current ||
-        !template.rootNodes.length
-      )
-        return;
-      const svgEl = svgRef.current;
-      const width = svgEl.getBoundingClientRect().width;
-      const height = svgEl.getBoundingClientRect().height;
-      if (!width || !height) return;
-      const rootId = template.rootNodes[0];
-      const simAny = simulationRef.current as unknown as {
-        nodes: () => GraphNode[];
-      };
-      const nodesArr = simAny.nodes();
-      const root = nodesArr.find((n) => n.id === rootId);
-      if (!root) return;
-      root.fx = width / 2;
-      root.fy = height / 2;
-      root.x = width / 2;
-      root.y = height / 2;
-      if (!soft) {
-        simulationRef.current.alpha(0.6).restart();
-        setTimeout(
-          () => simulationRef.current && simulationRef.current.alphaTarget(0),
-          250
-        );
-      } else {
-        simulationRef.current.alphaTarget(0.3).restart();
-        setTimeout(
-          () => simulationRef.current && simulationRef.current.alphaTarget(0),
-          200
-        );
-      }
-    },
-    [template.rootNodes]
-  );
+  const recenterRoot = useCallback(() => {
+    if (!simulationRef.current || !svgRef.current || !template.rootNodes.length)
+      return;
+    const rootId = template.rootNodes[0];
+    const w = svgRef.current.getBoundingClientRect().width;
+    const h = svgRef.current.getBoundingClientRect().height;
+    const sim = simulationRef.current as d3.Simulation<GraphNode, undefined>;
+    const nodes = sim.nodes();
+    const root = nodes.find((n) => n.id === rootId);
+    if (root) {
+      root.fx = w / 2;
+      root.fy = h / 2;
+      root.x = w / 2;
+      root.y = h / 2;
+      root.vx = 0;
+      root.vy = 0;
+    }
+    simulationRef.current.alpha(0.25).restart();
+    setTimeout(
+      () => simulationRef.current && simulationRef.current.alphaTarget(0),
+      220
+    );
+  }, [template.rootNodes]);
 
-  // Construction / reconstruction du graphe uniquement quand la structure (template) change
   useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select<SVGSVGElement, unknown>(svgRef.current);
@@ -101,7 +83,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     const height = container ? container.clientHeight : 500;
     svg.attr("width", width).attr("height", height);
 
-    // Clone des nœuds pour empêcher D3 de muter l'état source (x,y,vx,vy,fx,fy)
     const nodeData: GraphNode[] = Object.values(template.nodes).map((n) => ({
       ...n,
     })) as GraphNode[];
@@ -116,12 +97,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       template.rootNodes && template.rootNodes.length > 0
         ? template.rootNodes[0]
         : nodeData.find((n) => !n.parent)?.id;
-    const isRoot = (d: GraphNode) => d.id === primaryRootId;
-    const rootNode = nodeData.find((n) => n.id === primaryRootId);
-    if (rootNode) {
-      rootNode.fx = width / 2;
-      rootNode.fy = height / 2;
-    }
+    // root node déjà implicitement positionné par le layout cluster
 
     svg
       .append("rect")
@@ -133,6 +109,49 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       .style("cursor", "pointer")
       .on("click", () => onSelectNodeRef.current(null));
 
+    const NODE_RADIUS = 32;
+    // Hiérarchie pour calculer des positions radiales cibles (structure stable)
+    interface HNode {
+      id: string;
+      name: string;
+      type: FileNode["type"];
+      children?: HNode[];
+    }
+    const buildHierarchy = (id: string): HNode => {
+      const n = template.nodes[id];
+      return {
+        id: n.id,
+        name: n.name,
+        type: n.type,
+        children: n.children.map((c) => buildHierarchy(c)),
+      };
+    };
+    const hRoot = primaryRootId ? buildHierarchy(primaryRootId) : null;
+    const root = hRoot ? d3.hierarchy<HNode>(hRoot, (d) => d.children) : null;
+    const radius = Math.min(width, height) / 2 - 40;
+    const cluster = d3
+      .cluster<HNode>()
+      .size([2 * Math.PI, Math.max(radius, NODE_RADIUS * 4)]);
+    if (root) cluster(root);
+    const targets: Record<string, { x: number; y: number }> = {};
+    if (root) {
+      root.descendants().forEach((d) => {
+        const angle = (d.x ?? 0) - Math.PI / 2; // 0 en haut
+        const r = d.y ?? 0;
+        targets[d.data.id] = {
+          x: width / 2 + Math.cos(angle) * r,
+          y: height / 2 + Math.sin(angle) * r,
+        };
+      });
+    }
+
+    // Initialiser positions des nœuds avec légère perturbation pour une animation douce
+    nodeData.forEach((n) => {
+      const t = targets[n.id] || { x: width / 2, y: height / 2 };
+      n.x = t.x + (Math.random() - 0.5) * 20;
+      n.y = t.y + (Math.random() - 0.5) * 20;
+    });
+
     const simulation = d3
       .forceSimulation<GraphNode>(nodeData)
       .force(
@@ -140,37 +159,54 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         d3
           .forceLink<GraphNode, GraphLink>(linkData)
           .id((d) => d.id)
-          .distance(100)
+          .distance(80)
+          .strength(0.9)
       )
-      .force("charge", d3.forceManyBody<GraphNode>().strength(-300))
+      .force("charge", d3.forceManyBody<GraphNode>().strength(-140))
       .force(
-        "forceXRoot",
+        "collision",
+        d3
+          .forceCollide<GraphNode>()
+          .radius(NODE_RADIUS + 8)
+          .strength(0.9)
+      )
+      .force(
+        "x",
         d3
           .forceX<GraphNode>()
-          .x(width / 2)
-          .strength((d) => (isRoot(d) ? 1 : 0.05))
+          .x((d) => targets[d.id]?.x ?? width / 2)
+          .strength((d) => (d.id === primaryRootId ? 1 : 0.15))
       )
       .force(
-        "forceYRoot",
+        "y",
         d3
           .forceY<GraphNode>()
-          .y(height / 2)
-          .strength((d) => (isRoot(d) ? 1 : 0.05))
+          .y((d) => targets[d.id]?.y ?? height / 2)
+          .strength((d) => (d.id === primaryRootId ? 1 : 0.15))
       );
 
-    const links = svg
+    // Fixer la racine au centre
+    if (primaryRootId) {
+      const rootNode = nodeData.find((n) => n.id === primaryRootId);
+      if (rootNode) {
+        rootNode.fx = width / 2;
+        rootNode.fy = height / 2;
+      }
+    }
+
+    const linkSel = svg
       .append("g")
       .selectAll("line")
       .data(linkData)
       .enter()
       .append("line")
-      .attr("stroke", "#999")
-      .attr("stroke-opacity", 0.6)
-      .attr("stroke-width", 2);
+      .attr("stroke", "#9CA3AF")
+      .attr("stroke-opacity", 0.7)
+      .attr("stroke-width", 1.6);
 
-    const nodes = svg
+    const nodeSel = svg
       .append("g")
-      .selectAll<SVGGElement, GraphNode>("g")
+      .selectAll<SVGGElement, GraphNode>("g.te-node")
       .data(nodeData)
       .enter()
       .append("g")
@@ -179,27 +215,27 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         d3
           .drag<SVGGElement, GraphNode>()
           .on("start", (event, d) => {
-            if (isRoot(d)) return;
+            if (d.id === primaryRootId) return; // racine immobile
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
           })
           .on("drag", (event, d) => {
-            if (isRoot(d)) return;
+            if (d.id === primaryRootId) return;
             d.fx = event.x;
             d.fy = event.y;
           })
           .on("end", (event, d) => {
-            if (isRoot(d)) return;
+            if (d.id === primaryRootId) return;
             if (!event.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
           })
       );
 
-    nodes
+    nodeSel
       .append("circle")
-      .attr("r", 25)
+      .attr("r", NODE_RADIUS)
       .attr("fill", (d) => (d.type === "directory" ? "#3B82F6" : "#10B981"))
       .attr("stroke", "#FFF")
       .attr("stroke-width", 2)
@@ -207,56 +243,70 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         onSelectNodeRef.current(d.id, { name: d.name, type: d.type });
       });
 
-    nodes
+    const MAX_LABEL = 12;
+    nodeSel
       .append("text")
-      .text((d) => d.name)
+      .text((d) =>
+        d.name.length > MAX_LABEL
+          ? d.name.slice(0, MAX_LABEL - 1) + "…"
+          : d.name
+      )
       .attr("text-anchor", "middle")
       .attr("dy", ".35em")
-      .attr("fill", "white")
+      .attr("fill", "#111827")
       .attr("font-size", "12px")
-      .attr("font-weight", "bold")
+      .attr("font-weight", "600")
       .style("pointer-events", "none");
+    nodeSel.append("title").text((d) => d.name);
 
     simulation.on("tick", () => {
-      links
+      // Re-fixer la racine
+      if (primaryRootId) {
+        const rootNode = nodeData.find((n) => n.id === primaryRootId);
+        if (rootNode && svgRef.current) {
+          const w = svgRef.current.getBoundingClientRect().width;
+          const h = svgRef.current.getBoundingClientRect().height;
+          rootNode.x = rootNode.fx = w / 2;
+          rootNode.y = rootNode.fy = h / 2;
+          rootNode.vx = 0;
+          rootNode.vy = 0;
+        }
+      }
+      linkSel
         .attr("x1", (d) => (d.source as GraphNode).x || 0)
         .attr("y1", (d) => (d.source as GraphNode).y || 0)
         .attr("x2", (d) => (d.target as GraphNode).x || 0)
         .attr("y2", (d) => (d.target as GraphNode).y || 0);
-      nodes.attr("transform", (d) => `translate(${d.x},${d.y})`);
+      nodeSel.attr("transform", (d) => `translate(${d.x || 0},${d.y || 0})`);
     });
+
     simulationRef.current = simulation;
-    // recentrage initial
-    recenterRoot(false);
+    recenterRoot();
   }, [template, recenterRoot]);
 
-  // Mise à jour visuelle (highlight) quand selectedNode change, sans rebâtir le graphe
   useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select<SVGSVGElement, unknown>(svgRef.current);
+    // Mise à jour du contour des cercles selon la sélection
     svg
-      .selectAll<SVGCircleElement, GraphNode>("circle")
-      .attr("stroke", (d) =>
-        selectedNode && d.id === selectedNode ? "#EF4444" : "#FFF"
-      )
-      .attr("stroke-width", (d) =>
-        selectedNode && d.id === selectedNode ? 3 : 2
-      );
+      .selectAll<SVGCircleElement, GraphNode>("g.te-node > circle")
+      .attr("stroke", function (d) {
+        return selectedNode && d.id === selectedNode ? "#EF4444" : "#FFF";
+      })
+      .attr("stroke-width", function (d) {
+        return selectedNode && d.id === selectedNode ? 3 : 2;
+      });
   }, [selectedNode]);
 
-  // Recentrage du nœud racine lors des changements de layout (ex panneau qui modifie largeur)
   useEffect(() => {
-    // Layout version change (ex panneau) => recenter après transition (soft = true)
-    const t = setTimeout(() => recenterRoot(true), 300);
-    return () => clearTimeout(t);
+    recenterRoot();
   }, [layoutVersion, recenterRoot]);
 
-  // ResizeObserver pour recenter sur redimensionnement du conteneur
   useEffect(() => {
     if (!svgRef.current) return;
     const parent = svgRef.current.parentElement;
     if (!parent) return;
-    const ro = new ResizeObserver(() => recenterRoot(true));
+    const ro = new ResizeObserver(() => recenterRoot());
     ro.observe(parent);
     return () => ro.disconnect();
   }, [recenterRoot]);

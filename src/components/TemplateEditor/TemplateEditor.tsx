@@ -14,6 +14,8 @@ import {
   toYamlHierarchy,
   fromYamlHierarchy,
 } from "./TemplateEditor.logic";
+import { buildPresetTemplate } from "./TemplatePresets";
+import type { PresetKey } from "./TemplatePresets";
 
 interface TemplateEditorProps {
   template: HierarchyTemplate | null;
@@ -180,7 +182,16 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
           minWidth: 0,
         }}
       >
-        <TemplateToolbar onExport={exportTemplate} onImport={importTemplate} />
+        <TemplateToolbar
+          onExport={exportTemplate}
+          onImport={importTemplate}
+          onAddPreset={(key: PresetKey) => {
+            const updated = buildPresetTemplate(key); // reset complet
+            onTemplateChange(updated);
+            setSelectedNode(null);
+            setNodeName("");
+          }}
+        />
         <div
           style={{
             ...teStyles.graphWrapper,
@@ -221,6 +232,11 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
           <NodePanel
             selectedNode={selectedNode}
             rootId={template?.rootNodes[0] ?? null}
+            selectedNodeHasChildren={
+              !!selectedNode &&
+              !!template?.nodes[selectedNode] &&
+              template!.nodes[selectedNode].children.length > 0
+            }
             nodeName={nodeName}
             setNodeName={setNodeName}
             nodeType={nodeType}

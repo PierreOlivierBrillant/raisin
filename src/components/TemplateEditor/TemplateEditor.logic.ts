@@ -129,6 +129,15 @@ export function updateNodeAttributes(
   if (isRoot(template, nodeId)) return null; // racine immuable
   const current = template.nodes[nodeId];
   if (!current) return null;
+  // Interdire conversion directory -> file si le dossier possède des enfants
+  if (
+    current.type === "directory" &&
+    attrs.type === "file" &&
+    current.children &&
+    current.children.length > 0
+  ) {
+    return null;
+  }
   const next = { ...current, ...attrs };
   if (next.name === current.name && next.type === current.type) return null;
   return { ...template, nodes: { ...template.nodes, [nodeId]: next } };

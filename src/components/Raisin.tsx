@@ -22,7 +22,7 @@ export const Raisin: React.FC = () => {
     <div className="app-shell">
       <header className="app-header">
         <h1>Raisin 🍇</h1>
-        <h2>Standardisateur de Dossiers ZIP</h2>
+        <h2>Standardisateur de dossiers ZIP</h2>
       </header>
       <nav className="tabs">
         <button

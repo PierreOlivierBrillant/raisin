@@ -4,6 +4,7 @@ import { nodePanelStyles } from "./NodePanel.styles";
 interface NodePanelProps {
   selectedNode: string | null;
   rootId: string | null;
+  selectedNodeHasChildren: boolean;
   nodeName: string;
   setNodeName: (v: string) => void;
   nodeType: "file" | "directory";
@@ -19,6 +20,7 @@ interface NodePanelProps {
 export const NodePanel: React.FC<NodePanelProps> = ({
   selectedNode,
   rootId,
+  selectedNodeHasChildren,
   nodeName,
   setNodeName,
   nodeType,
@@ -63,8 +65,19 @@ export const NodePanel: React.FC<NodePanelProps> = ({
               disabled={!selectedNode || isRoot}
             >
               <option value="directory">Dossier</option>
-              <option value="file">Fichier</option>
+              <option
+                value="file"
+                disabled={nodeType === "directory" && selectedNodeHasChildren}
+              >
+                Fichier
+              </option>
             </select>
+            {selectedNodeHasChildren && nodeType === "directory" && (
+              <p style={{ fontSize: 12, marginTop: 4, color: "#B45309" }}>
+                Impossible de convertir en fichier: ce dossier contient des
+                enfants.
+              </p>
+            )}
           </div>
         </div>
         {selectedNode && (
