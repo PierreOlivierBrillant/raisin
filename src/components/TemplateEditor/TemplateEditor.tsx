@@ -217,14 +217,66 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                 }
               }}
               layoutVersion={layoutVersion}
+              panelOpen={showPanel}
+              panelWidth={panelWidth}
             />
           )}
         </div>
         <div style={teStyles.legend} className="no-last-mb graph-legend">
-          <p>• Bleu: Dossiers | Vert: Fichiers</p>
+          <p
+            style={{
+              display: "flex",
+              gap: "0.75rem",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+            >
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 4,
+                  background: "#EF4444",
+                  boxShadow: "0 0 0 2px #7F1D1D inset",
+                }}
+              />
+              Racine
+            </span>
+            <span
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+            >
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 4,
+                  background: "#3B82F6",
+                  boxShadow: "0 0 0 2px #1D4ED8 inset",
+                }}
+              />
+              Dossiers
+            </span>
+            <span
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+            >
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 4,
+                  background: "#10B981",
+                  boxShadow: "0 0 0 2px #047857 inset",
+                }}
+              />
+              Fichiers
+            </span>
+          </p>
         </div>
       </div>
-  {isMobile ? (
+      {isMobile ? (
         <div style={{ marginTop: "1rem" }}>
           <AnimatedNodePanel show={showPanel} duration={240}>
             <NodePanel

@@ -12,6 +12,8 @@ interface GraphCanvasProps {
     meta?: { name: string; type: FileNode["type"] }
   ) => void;
   layoutVersion?: number;
+  panelOpen?: boolean;
+  panelWidth?: number; // largeur occupée par le panneau (pour décaler le centre)
 }
 
 type GraphNode = FileNode & {
@@ -32,6 +34,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   selectedNode,
   onSelectNode,
   layoutVersion,
+  panelOpen = false,
+  panelWidth = 0,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLElement | null>(null);
@@ -55,21 +59,22 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     const rootId = template.rootNodes[0];
     const w = svgRef.current.getBoundingClientRect().width;
     const h = svgRef.current.getBoundingClientRect().height;
+    const centerX = w / 2; // centre stable (on animera une translation globale pour le push)
     const sim = simulationRef.current as d3.Simulation<GraphNode, undefined>;
     const nodes = sim.nodes();
     const root = nodes.find((n) => n.id === rootId);
     if (root) {
-      root.fx = w / 2;
+      root.fx = centerX;
       root.fy = h / 2;
-      root.x = w / 2;
+      root.x = centerX;
       root.y = h / 2;
       root.vx = 0;
       root.vy = 0;
     }
-    simulationRef.current.alpha(0.25).restart();
+    simulationRef.current.alpha(0.12).restart();
     setTimeout(
       () => simulationRef.current && simulationRef.current.alphaTarget(0),
-      220
+      180
     );
   }, [template.rootNodes]);
 
@@ -82,6 +87,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     const container = svgRef.current.parentElement;
     const height = container ? container.clientHeight : 500;
     svg.attr("width", width).attr("height", height);
+    const centerX = width / 2; // ne dépend plus de panelOpen
 
     const nodeData: GraphNode[] = Object.values(template.nodes).map((n) => ({
       ...n,
@@ -109,7 +115,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       .style("cursor", "pointer")
       .on("click", () => onSelectNodeRef.current(null));
 
-    const NODE_RADIUS = 32;
+    const NODE_RADIUS = 44; // agrandi (32 précédemment)
     // Hiérarchie pour calculer des positions radiales cibles (structure stable)
     interface HNode {
       id: string;
@@ -133,13 +139,23 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       .cluster<HNode>()
       .size([2 * Math.PI, Math.max(radius, NODE_RADIUS * 4)]);
     if (root) cluster(root);
+
+    // Mapping profondeur -> id pour moduler la couleur par distance à la racine
+    const depthMap: Record<string, number> = {};
+    let maxDepth = 1;
+    if (root) {
+      root.descendants().forEach((d) => {
+        depthMap[d.data.id] = d.depth;
+        if (d.depth > maxDepth) maxDepth = d.depth;
+      });
+    }
     const targets: Record<string, { x: number; y: number }> = {};
     if (root) {
       root.descendants().forEach((d) => {
         const angle = (d.x ?? 0) - Math.PI / 2; // 0 en haut
         const r = d.y ?? 0;
         targets[d.data.id] = {
-          x: width / 2 + Math.cos(angle) * r,
+          x: centerX + Math.cos(angle) * r,
           y: height / 2 + Math.sin(angle) * r,
         };
       });
@@ -147,7 +163,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
     // Initialiser positions des nœuds avec légère perturbation pour une animation douce
     nodeData.forEach((n) => {
-      const t = targets[n.id] || { x: width / 2, y: height / 2 };
+      const t = targets[n.id] || { x: centerX, y: height / 2 };
       n.x = t.x + (Math.random() - 0.5) * 20;
       n.y = t.y + (Math.random() - 0.5) * 20;
     });
@@ -159,22 +175,29 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         d3
           .forceLink<GraphNode, GraphLink>(linkData)
           .id((d) => d.id)
-          .distance(80)
+          // distance augmentée pour compenser l'augmentation du rayon
+          .distance(100)
           .strength(0.9)
       )
-      .force("charge", d3.forceManyBody<GraphNode>().strength(-140))
+      .force(
+        "charge",
+        d3
+          .forceManyBody<GraphNode>()
+          // charge un peu plus négative pour espacer les plus gros nœuds
+          .strength(-160)
+      )
       .force(
         "collision",
         d3
           .forceCollide<GraphNode>()
-          .radius(NODE_RADIUS + 8)
-          .strength(0.9)
+          .radius(NODE_RADIUS + 10)
+          .strength(0.95)
       )
       .force(
         "x",
         d3
           .forceX<GraphNode>()
-          .x((d) => targets[d.id]?.x ?? width / 2)
+          .x((d) => targets[d.id]?.x ?? centerX)
           .strength((d) => (d.id === primaryRootId ? 1 : 0.15))
       )
       .force(
@@ -189,12 +212,15 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     if (primaryRootId) {
       const rootNode = nodeData.find((n) => n.id === primaryRootId);
       if (rootNode) {
-        rootNode.fx = width / 2;
+        rootNode.fx = centerX;
         rootNode.fy = height / 2;
       }
     }
 
-    const linkSel = svg
+    // Groupe racine pour animation de translation globale (push latéral)
+    const sceneG = svg.append("g").attr("class", "te-scene");
+
+    const linkSel = sceneG
       .append("g")
       .selectAll("line")
       .data(linkData)
@@ -204,7 +230,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       .attr("stroke-opacity", 0.7)
       .attr("stroke-width", 1.6);
 
-    const nodeSel = svg
+    const nodeSel = sceneG
       .append("g")
       .selectAll<SVGGElement, GraphNode>("g.te-node")
       .data(nodeData)
@@ -222,8 +248,17 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           })
           .on("drag", (event, d) => {
             if (d.id === primaryRootId) return;
-            d.fx = event.x;
-            d.fy = event.y;
+            // Clamp pendant le drag
+            const w = svgRef.current?.getBoundingClientRect().width || width;
+            const h = svgRef.current?.getBoundingClientRect().height || height;
+            const minX = NODE_RADIUS;
+            const maxX = w - NODE_RADIUS;
+            const minY = NODE_RADIUS;
+            const maxY = h - NODE_RADIUS;
+            const cx = Math.max(minX, Math.min(maxX, event.x));
+            const cy = Math.max(minY, Math.min(maxY, event.y));
+            d.fx = cx;
+            d.fy = cy;
           })
           .on("end", (event, d) => {
             if (d.id === primaryRootId) return;
@@ -233,17 +268,34 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           })
       );
 
+    const colorFor = (d: GraphNode) => {
+      if (d.id === primaryRootId) return "#EF4444";
+      const depth = depthMap[d.id] ?? 0;
+      if (depth === 0) {
+        return d.type === "directory" ? "#3B82F6" : "#10B981";
+      }
+      const t = maxDepth > 0 ? depth / maxDepth : 0; // 0 -> proche racine, 1 -> plus loin
+      const base =
+        d.type === "directory" ? d3.hsl("#3B82F6") : d3.hsl("#10B981");
+      // Désaturation progressive et éclaircissement
+      const s = base.s * (1 - 0.55 * t); // réduit saturation jusqu'à -55%
+      const l = base.l + (1 - base.l) * 0.45 * t; // augmente la luminosité jusqu'à +45% du potentiel restant
+      base.s = Math.max(0, Math.min(1, s));
+      base.l = Math.max(0, Math.min(1, l));
+      return base.formatHex();
+    };
+
     nodeSel
       .append("circle")
       .attr("r", NODE_RADIUS)
-      .attr("fill", (d) => (d.type === "directory" ? "#3B82F6" : "#10B981"))
-      .attr("stroke", "#FFF")
-      .attr("stroke-width", 2)
+      .attr("fill", (d) => colorFor(d))
+      .attr("stroke", (d) => (d.id === primaryRootId ? "#7F1D1D" : "#FFF"))
+      .attr("stroke-width", (d) => (d.id === primaryRootId ? 3 : 2))
       .on("click", (_, d) => {
         onSelectNodeRef.current(d.id, { name: d.name, type: d.type });
       });
 
-    const MAX_LABEL = 12;
+    const MAX_LABEL = 14; // un peu plus de place dans un cercle plus grand
     nodeSel
       .append("text")
       .text((d) =>
@@ -254,7 +306,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       .attr("text-anchor", "middle")
       .attr("dy", ".35em")
       .attr("fill", "#111827")
-      .attr("font-size", "12px")
+      .attr("font-size", "13px")
       .attr("font-weight", "600")
       .style("pointer-events", "none");
     nodeSel.append("title").text((d) => d.name);
@@ -272,12 +324,51 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           rootNode.vy = 0;
         }
       }
+
+      // Dimensions courantes pour clamp
+      const curW = svgRef.current?.getBoundingClientRect().width || width;
+      const curH = svgRef.current?.getBoundingClientRect().height || height;
+      const minX = NODE_RADIUS;
+      const maxX = curW - NODE_RADIUS; // on ne décale plus le clamp; translation globale gère le push
+      const minY = NODE_RADIUS;
+      const maxY = curH - NODE_RADIUS;
+
+      nodeData.forEach((n) => {
+        if (n.id === primaryRootId) return; // déjà géré
+        if (n.x == null || n.y == null) return;
+        let clamped = false;
+        if (n.x < minX) {
+          n.x = minX;
+          n.vx = 0;
+          clamped = true;
+        } else if (n.x > maxX) {
+          n.x = maxX;
+          n.vx = 0;
+          clamped = true;
+        }
+        if (n.y < minY) {
+          n.y = minY;
+          n.vy = 0;
+          clamped = true;
+        } else if (n.y > maxY) {
+          n.y = maxY;
+          n.vy = 0;
+          clamped = true;
+        }
+        if (clamped && n.fx != null && n.fy != null) {
+          // si l'utilisateur maintient un drag, maintenir le clamp
+          n.fx = Math.max(minX, Math.min(maxX, n.fx));
+          n.fy = Math.max(minY, Math.min(maxY, n.fy));
+        }
+      });
       linkSel
         .attr("x1", (d) => (d.source as GraphNode).x || 0)
         .attr("y1", (d) => (d.source as GraphNode).y || 0)
         .attr("x2", (d) => (d.target as GraphNode).x || 0)
         .attr("y2", (d) => (d.target as GraphNode).y || 0);
       nodeSel.attr("transform", (d) => `translate(${d.x || 0},${d.y || 0})`);
+      // applique la translation globale
+      sceneG.attr("transform", `translate(${offsetRef.current},0)`);
     });
 
     simulationRef.current = simulation;
@@ -291,16 +382,50 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     svg
       .selectAll<SVGCircleElement, GraphNode>("g.te-node > circle")
       .attr("stroke", function (d) {
+        if (d.id === template.rootNodes[0]) return "#7F1D1D"; // root conserve son contour sombre
         return selectedNode && d.id === selectedNode ? "#EF4444" : "#FFF";
       })
       .attr("stroke-width", function (d) {
+        if (d.id === template.rootNodes[0]) return 3;
         return selectedNode && d.id === selectedNode ? 3 : 2;
       });
-  }, [selectedNode]);
+  }, [selectedNode, template.rootNodes]);
 
   useEffect(() => {
     recenterRoot();
   }, [layoutVersion, recenterRoot]);
+
+  // Animation douce du "push" latéral via translation globale
+  const offsetRef = useRef(0);
+  const animRef = useRef<number | null>(null);
+  useEffect(() => {
+    const start = offsetRef.current;
+    const target = panelOpen ? -panelWidth * 0.42 : 0; // ratio pour ne pas trop écraser
+    const duration = 340;
+    const t0 = performance.now();
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    const ease = (x: number) =>
+      x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; // cubic easeInOut
+    const step = () => {
+      const now = performance.now();
+      const p = Math.min(1, (now - t0) / duration);
+      const e = ease(p);
+      offsetRef.current = start + (target - start) * e;
+      // déclencher un tick visuel léger en ajustant alpha sans relancer tout
+      if (simulationRef.current && p < 1) {
+        simulationRef.current.alphaTarget(0.02).restart();
+      } else if (simulationRef.current && p === 1) {
+        simulationRef.current.alphaTarget(0);
+      }
+      if (p < 1) {
+        animRef.current = requestAnimationFrame(step);
+      }
+    };
+    animRef.current = requestAnimationFrame(step);
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [panelOpen, panelWidth]);
 
   useEffect(() => {
     if (!svgRef.current) return;

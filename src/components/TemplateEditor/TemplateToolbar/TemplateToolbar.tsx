@@ -6,6 +6,10 @@ import reactLogo from "../../../assets/react.svg";
 import angularLogo from "../../../assets/angular.svg";
 import vueLogo from "../../../assets/vue.svg";
 import dotnetLogo from "../../../assets/dotnet.svg";
+import mavenLogo from "../../../assets/maven.svg";
+import gradleLogo from "../../../assets/gradle.svg";
+import flutterLogo from "../../../assets/flutter.svg";
+import androidLogo from "../../../assets/android.svg";
 
 interface TemplateToolbarProps {
   onExport: () => void;
@@ -60,6 +64,26 @@ export const TemplateToolbar: React.FC<TemplateToolbarProps> = ({
           label=".NET"
           logo={dotnetLogo}
           onClick={() => onAddPreset("dotnet")}
+        />
+        <PresetButton
+          label="Maven"
+          logo={mavenLogo}
+          onClick={() => onAddPreset("maven")}
+        />
+        <PresetButton
+          label="Gradle"
+          logo={gradleLogo}
+          onClick={() => onAddPreset("gradle")}
+        />
+        <PresetButton
+          label="Flutter"
+          logo={flutterLogo}
+          onClick={() => onAddPreset("flutter")}
+        />
+        <PresetButton
+          label="Android"
+          logo={androidLogo}
+          onClick={() => onAddPreset("android")}
         />
       </div>
     </div>

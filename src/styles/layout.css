@@ -10,16 +10,14 @@ body {
   display: block;
 }
 
-/* Réserver l'espace de scrollbar pour éviter le saut de layout quand le panel latéral apparaît */
 html {
   scrollbar-gutter: stable both-edges;
 }
 body {
-  overflow-y: scroll; /* force la présence de la scrollbar même si pas nécessaire -> pas de flash */
-  overflow-x: hidden; /* empêche zone grise/scroll horizontal quand le panneau est en translation */
+  overflow-y: scroll;
+  overflow-x: hidden;
 }
 
-/* Animation douce du panneau évite reflow brusque */
 .node-panel-transition {
   will-change: width, transform;
 }

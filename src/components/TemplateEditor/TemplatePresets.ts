@@ -3,7 +3,15 @@
 import type { HierarchyTemplate, FileNode } from "../../types";
 import { createNode, createDefaultTemplate } from "./TemplateEditor.logic";
 
-export type PresetKey = "react" | "angular" | "vue" | "dotnet";
+export type PresetKey =
+  | "react"
+  | "angular"
+  | "vue"
+  | "dotnet"
+  | "maven"
+  | "gradle"
+  | "flutter"
+  | "android";
 
 interface PresetEntry {
   path: string; // ex: "src/components" ou "src/App.tsx"
@@ -46,11 +54,61 @@ const dotnetPreset: PresetEntry[] = [
   { path: "*.sln", type: "file" },
 ];
 
+const mavenPreset: PresetEntry[] = [
+  { path: "pom.xml", type: "file" },
+  { path: "src", type: "directory" },
+  { path: "src/main", type: "directory" },
+  { path: "src/main/java", type: "directory" },
+  { path: "src/main/resources", type: "directory" },
+  { path: "src/test", type: "directory" },
+  { path: "src/test/java", type: "directory" },
+  { path: "src/test/resources", type: "directory" },
+];
+
+const gradlePreset: PresetEntry[] = [
+  { path: "settings.gradle", type: "file" },
+  { path: "build.gradle", type: "file" },
+  { path: "gradle.properties", type: "file" },
+  { path: "src", type: "directory" },
+  { path: "src/main", type: "directory" },
+  { path: "src/main/java", type: "directory" },
+  { path: "src/main/resources", type: "directory" },
+  { path: "src/test", type: "directory" },
+  { path: "src/test/java", type: "directory" },
+  { path: "src/test/resources", type: "directory" },
+];
+
+// Flutter typical project layout
+const flutterPreset: PresetEntry[] = [
+  { path: "pubspec.yaml", type: "file" },
+  { path: "lib", type: "directory" },
+];
+
+const androidPreset: PresetEntry[] = [
+  { path: "settings.gradle", type: "file" },
+  { path: "build.gradle", type: "file" },
+  { path: "gradle.properties", type: "file" },
+  { path: "gradle", type: "directory" },
+  { path: "gradle/wrapper", type: "directory" },
+  { path: "gradle/wrapper/gradle-wrapper.properties", type: "file" },
+  { path: "app", type: "directory" },
+  { path: "app/build.gradle", type: "file" },
+  { path: "app/src", type: "directory" },
+  { path: "app/src/main", type: "directory" },
+  { path: "app/src/main/java", type: "directory" },
+  { path: "app/src/main/res", type: "directory" },
+  { path: "app/src/main/AndroidManifest.xml", type: "file" },
+];
+
 const PRESETS: Record<PresetKey, PresetEntry[]> = {
   react: reactPreset,
   angular: angularPreset,
   vue: vuePreset,
   dotnet: dotnetPreset,
+  maven: mavenPreset,
+  gradle: gradlePreset,
+  flutter: flutterPreset,
+  android: androidPreset,
 };
 
 /**
