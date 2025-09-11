@@ -12,16 +12,11 @@ interface PresetEntry {
 
 const reactPreset: PresetEntry[] = [
   { path: "src", type: "directory" },
-  { path: "src/components", type: "directory" },
-  { path: "src/hooks", type: "directory" },
-  { path: "src/pages", type: "directory" },
-  { path: "src/assets", type: "directory" },
-  { path: "src/App.tsx", type: "file" },
-  { path: "src/main.tsx", type: "file" },
+  { path: "src/App.*sx", type: "file" },
+  { path: "src/main.*sx", type: "file" },
   { path: "public", type: "directory" },
   { path: "package.json", type: "file" },
   { path: "tsconfig.json", type: "file" },
-  { path: "vite.config.ts", type: "file" },
 ];
 
 const angularPreset: PresetEntry[] = [
@@ -29,10 +24,6 @@ const angularPreset: PresetEntry[] = [
   { path: "src/app", type: "directory" },
   { path: "src/app/app.component.ts", type: "file" },
   { path: "src/app/app.module.ts", type: "file" },
-  { path: "src/assets", type: "directory" },
-  { path: "src/environments", type: "directory" },
-  { path: "src/environments/environment.ts", type: "file" },
-  { path: "src/environments/environment.prod.ts", type: "file" },
   { path: "angular.json", type: "file" },
   { path: "package.json", type: "file" },
   { path: "tsconfig.json", type: "file" },
@@ -40,11 +31,8 @@ const angularPreset: PresetEntry[] = [
 
 const vuePreset: PresetEntry[] = [
   { path: "src", type: "directory" },
-  { path: "src/components", type: "directory" },
-  { path: "src/components/HelloWorld.vue", type: "file" },
-  { path: "src/assets", type: "directory" },
   { path: "src/App.vue", type: "file" },
-  { path: "src/main.ts", type: "file" },
+  { path: "src/main.*s", type: "file" },
   { path: "index.html", type: "file" },
   { path: "package.json", type: "file" },
   { path: "tsconfig.json", type: "file" },
@@ -52,18 +40,10 @@ const vuePreset: PresetEntry[] = [
 ];
 
 const dotnetPreset: PresetEntry[] = [
-  { path: "src", type: "directory" },
-  { path: "src/Controllers", type: "directory" },
-  { path: "src/Controllers/WeatherForecastController.cs", type: "file" },
-  { path: "src/Models", type: "directory" },
-  { path: "src/Models/WeatherForecast.cs", type: "file" },
-  { path: "src/Program.cs", type: "file" },
-  { path: "src/appsettings.json", type: "file" },
-  { path: "src/appsettings.Development.json", type: "file" },
-  { path: "Properties", type: "directory" },
-  { path: "Properties/launchSettings.json", type: "file" },
-  { path: "Solution.sln", type: "file" },
-  { path: "README.md", type: "file" },
+  { path: "*", type: "directory" },
+  { path: "*/Program.cs", type: "file" },
+  { path: "*/*.csproj", type: "file" },
+  { path: "*.sln", type: "file" },
 ];
 
 const PRESETS: Record<PresetKey, PresetEntry[]> = {

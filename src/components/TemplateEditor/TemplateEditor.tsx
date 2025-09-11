@@ -163,12 +163,16 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
   return (
     <div
       style={{
+        position: "relative",
         display: "flex",
-        flexDirection: isMobile ? "column" : "row",
-        gap: isMobile ? 0 : "1rem",
+        flexDirection: isMobile ? "column" : "column",
         width: "100%",
         boxSizing: "border-box",
         alignItems: "stretch",
+        minHeight: isMobile ? undefined : cardHeight,
+        // Réserve l'espace horizontal uniquement quand le panneau est visible
+        paddingRight: !isMobile && showPanel ? panelWidth : 0,
+        transition: "padding-right 240ms ease",
       }}
     >
       <div
@@ -178,8 +182,8 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
           display: "flex",
           flexDirection: "column",
           height: cardHeight,
-          flex: "1 1 auto",
           minWidth: 0,
+          // Sur desktop laisser la largeur pleine (le panel sera overlay)
         }}
       >
         <TemplateToolbar
@@ -220,36 +224,71 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
           <p>• Bleu: Dossiers | Vert: Fichiers</p>
         </div>
       </div>
-      <div
-        style={{
-          width: isMobile ? "100%" : showPanel ? panelWidth : 0,
-          transition: "width 280ms ease",
-          overflow: "hidden",
-          flex: isMobile ? "0 0 auto" : undefined,
-        }}
-      >
-        <AnimatedNodePanel show={showPanel} duration={240}>
-          <NodePanel
-            selectedNode={selectedNode}
-            rootId={template?.rootNodes[0] ?? null}
-            selectedNodeHasChildren={
-              !!selectedNode &&
-              !!template?.nodes[selectedNode] &&
-              template!.nodes[selectedNode].children.length > 0
-            }
-            nodeName={nodeName}
-            setNodeName={setNodeName}
-            nodeType={nodeType}
-            setNodeType={setNodeType}
-            childName={childName}
-            setChildName={setChildName}
-            childType={childType}
-            setChildType={setChildType}
-            addChildNode={addChildNode}
-            deleteSelectedNode={deleteSelectedNode}
-          />
-        </AnimatedNodePanel>
-      </div>
+  {isMobile ? (
+        <div style={{ marginTop: "1rem" }}>
+          <AnimatedNodePanel show={showPanel} duration={240}>
+            <NodePanel
+              selectedNode={selectedNode}
+              rootId={template?.rootNodes[0] ?? null}
+              selectedNodeHasChildren={
+                !!selectedNode &&
+                !!template?.nodes[selectedNode] &&
+                template!.nodes[selectedNode].children.length > 0
+              }
+              nodeName={nodeName}
+              setNodeName={setNodeName}
+              nodeType={nodeType}
+              setNodeType={setNodeType}
+              childName={childName}
+              setChildName={setChildName}
+              childType={childType}
+              setChildType={setChildType}
+              addChildNode={addChildNode}
+              deleteSelectedNode={deleteSelectedNode}
+            />
+          </AnimatedNodePanel>
+        </div>
+      ) : (
+        <div
+          className="node-panel-transition"
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            height: "100%",
+            width: panelWidth,
+            transform: showPanel ? "translateX(0)" : "translateX(100%)",
+            transition: "transform 240ms ease",
+            boxSizing: "border-box",
+            paddingLeft: "0.5rem",
+            pointerEvents: showPanel ? "auto" : "none",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <AnimatedNodePanel show={showPanel} duration={240}>
+            <NodePanel
+              selectedNode={selectedNode}
+              rootId={template?.rootNodes[0] ?? null}
+              selectedNodeHasChildren={
+                !!selectedNode &&
+                !!template?.nodes[selectedNode] &&
+                template!.nodes[selectedNode].children.length > 0
+              }
+              nodeName={nodeName}
+              setNodeName={setNodeName}
+              nodeType={nodeType}
+              setNodeType={setNodeType}
+              childName={childName}
+              setChildName={setChildName}
+              childType={childType}
+              setChildType={setChildType}
+              addChildNode={addChildNode}
+              deleteSelectedNode={deleteSelectedNode}
+            />
+          </AnimatedNodePanel>
+        </div>
+      )}
     </div>
   );
 };
