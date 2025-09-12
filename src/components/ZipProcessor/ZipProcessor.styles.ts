@@ -2,9 +2,37 @@ export const zpStyles = {
   root: {
     display: "flex",
     flexDirection: "column" as const,
-    gap: "2rem",
+    gap: "1rem",
     width: "100%",
     boxSizing: "border-box" as const,
+  },
+  stepper: {
+    display: "flex",
+    gap: ".75rem",
+    flexWrap: "wrap" as const,
+  },
+  configForm: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "1rem",
+  },
+  formRow: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: ".35rem",
+  },
+  inlineFields: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "1rem",
+  },
+  input: {
+    padding: ".6rem .7rem",
+    border: "1px solid #d1d5db",
+    borderRadius: ".375rem",
+    fontSize: ".9rem",
+    flex: 1,
+    minWidth: "220px",
   },
   uploadZone: {
     border: "2px dashed #d1d5db",

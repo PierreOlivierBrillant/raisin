@@ -12,8 +12,6 @@ interface GraphCanvasProps {
     meta?: { name: string; type: FileNode["type"] }
   ) => void;
   layoutVersion?: number;
-  panelOpen?: boolean;
-  panelWidth?: number; // largeur occupée par le panneau (pour décaler le centre)
 }
 
 type GraphNode = FileNode & {
@@ -34,8 +32,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   selectedNode,
   onSelectNode,
   layoutVersion,
-  panelOpen = false,
-  panelWidth = 0,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLElement | null>(null);
@@ -70,6 +66,15 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       root.y = h / 2;
       root.vx = 0;
       root.vy = 0;
+      // Correction mineure si root a déjà dérivé (cas rares après ticks)
+      const driftX = Math.abs((root.x || 0) - centerX);
+      const driftY = Math.abs((root.y || 0) - h / 2);
+      if (driftX > 4 || driftY > 4) {
+        root.x = centerX;
+        root.y = h / 2;
+        root.fx = centerX;
+        root.fy = h / 2;
+      }
     }
     simulationRef.current.alpha(0.12).restart();
     setTimeout(
@@ -368,12 +373,16 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         .attr("y2", (d) => (d.target as GraphNode).y || 0);
       nodeSel.attr("transform", (d) => `translate(${d.x || 0},${d.y || 0})`);
       // applique la translation globale
-      sceneG.attr("transform", `translate(${offsetRef.current},0)`);
+      // Plus de translation globale : l'espace latéral est désormais réservé par padding-right
+      // sceneG.attr("transform", `translate(${offsetRef.current},0)`);
     });
 
     simulationRef.current = simulation;
     recenterRoot();
-  }, [template, recenterRoot]);
+    // Recentrage différé pour stabiliser après les premiers ticks
+    setTimeout(() => recenterRoot(), 60);
+    setTimeout(() => recenterRoot(), 140);
+  }, [template, recenterRoot, layoutVersion]);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -395,46 +404,37 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     recenterRoot();
   }, [layoutVersion, recenterRoot]);
 
-  // Animation douce du "push" latéral via translation globale
-  const offsetRef = useRef(0);
-  const animRef = useRef<number | null>(null);
-  useEffect(() => {
-    const start = offsetRef.current;
-    const target = panelOpen ? -panelWidth * 0.42 : 0; // ratio pour ne pas trop écraser
-    const duration = 340;
-    const t0 = performance.now();
-    if (animRef.current) cancelAnimationFrame(animRef.current);
-    const ease = (x: number) =>
-      x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; // cubic easeInOut
-    const step = () => {
-      const now = performance.now();
-      const p = Math.min(1, (now - t0) / duration);
-      const e = ease(p);
-      offsetRef.current = start + (target - start) * e;
-      // déclencher un tick visuel léger en ajustant alpha sans relancer tout
-      if (simulationRef.current && p < 1) {
-        simulationRef.current.alphaTarget(0.02).restart();
-      } else if (simulationRef.current && p === 1) {
-        simulationRef.current.alphaTarget(0);
-      }
-      if (p < 1) {
-        animRef.current = requestAnimationFrame(step);
-      }
-    };
-    animRef.current = requestAnimationFrame(step);
-    return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-    };
-  }, [panelOpen, panelWidth]);
+  // Translation globale désactivée : on centre la racine sur la zone réellement disponible.
 
   useEffect(() => {
     if (!svgRef.current) return;
     const parent = svgRef.current.parentElement;
     if (!parent) return;
-    const ro = new ResizeObserver(() => recenterRoot());
+    const svgEl = svgRef.current;
+    const updateSize = () => {
+      if (!svgEl || !parent) return;
+      const w = parent.clientWidth;
+      const h = parent.clientHeight;
+      d3.select(svgEl).attr("width", w).attr("height", h);
+      recenterRoot();
+    };
+    const ro = new ResizeObserver(updateSize);
     ro.observe(parent);
-    return () => ro.disconnect();
+    const mo = new MutationObserver(updateSize);
+    mo.observe(parent, {
+      attributes: true,
+      attributeFilter: ["style", "class"],
+    });
+    // Premier ajustement post-macro-tâche pour laisser le layout se stabiliser
+    requestAnimationFrame(() => updateSize());
+    setTimeout(updateSize, 60);
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
   }, [recenterRoot]);
 
-  return <svg ref={svgRef} style={graphCanvasStyles.svg} />;
+  return (
+    <svg ref={svgRef} style={{ ...graphCanvasStyles.svg, height: "100%" }} />
+  );
 };
