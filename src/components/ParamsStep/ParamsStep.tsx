@@ -23,6 +23,7 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
 }) => {
   const [studentRootPath, setStudentRootPath] = useState("");
   const [projectsPerStudent, setProjectsPerStudent] = useState(1);
+  const [similarityThreshold, setSimilarityThreshold] = useState(90);
   // Plus de modal : le sélecteur est inline directement
 
   const start = async () => {
@@ -38,6 +39,7 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
         zipFile,
         studentRootPath,
         projectsPerStudent,
+        similarityThreshold,
       });
       onAnalysisComplete(results);
       onNext?.();
@@ -86,6 +88,19 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
               min={1}
               value={projectsPerStudent}
               onChange={(e) => setProjectsPerStudent(Number(e.target.value))}
+              style={paramsStyles.input}
+            />
+          </div>
+          <div style={{ ...paramsStyles.formRow, flex: 1 }}>
+            <label style={{ fontSize: ".8rem", fontWeight: 500 }}>
+              Seuil de similarité (%)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={similarityThreshold}
+              onChange={(e) => setSimilarityThreshold(Number(e.target.value))}
               style={paramsStyles.input}
             />
           </div>

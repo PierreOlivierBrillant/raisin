@@ -11,6 +11,7 @@ export interface AnalysisParams {
   zipFile: File; // archive fournie par l'utilisateur
   studentRootPath: string; // chemin (dans le zip) du dossier contenant les dossiers étudiants ("" si racine)
   projectsPerStudent: number; // limite de projets à détecter
+  similarityThreshold?: number; // pourcentage minimal (0-100) requis (défaut 90)
 }
 
 /**
@@ -24,6 +25,10 @@ export async function analyzeZipStructureMock(
   params: AnalysisParams
 ): Promise<StudentFolder[]> {
   const { template, zipFile, studentRootPath, projectsPerStudent } = params;
+  const similarityThreshold = Math.min(
+    100,
+    Math.max(0, params.similarityThreshold ?? 90)
+  );
   const data = await zipFile.arrayBuffer();
   const zip = await JSZip.loadAsync(data);
 
@@ -269,7 +274,7 @@ export async function analyzeZipStructureMock(
       matchResults.push({ templateNodeId: tni.id, foundPath, score, status });
     }
     const similarity = Math.round((matched / totalTemplateNodes) * 100);
-    if (similarity < 90) return null; // seuil de 90%
+    if (similarity < similarityThreshold) return null; // seuil dynamique
     // Le nom du dossier de l'étudiant est le premier segment après studentRootPath
     const studentName = studentRoot
       .slice(studentDirPrefix.length)
