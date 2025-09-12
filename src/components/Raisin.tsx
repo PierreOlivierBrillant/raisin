@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ZipProcessor } from "./ZipProcessor/ZipProcessor";
+import { ZipUploadStep } from "./ZipUploadStep/ZipUploadStep";
+import { ParamsStep } from "./ParamsStep/ParamsStep";
+import { ResultsStep } from "./ResultsStep/ResultsStep";
 import { TemplateEditor } from "./TemplateEditor/TemplateEditor";
 import { Stepper } from "./Stepper/Stepper";
 import type { HierarchyTemplate, StudentFolder } from "../types";
@@ -8,10 +10,8 @@ import "../styles/layout.css";
 export const Raisin: React.FC = () => {
   const [currentTemplate, setCurrentTemplate] =
     useState<HierarchyTemplate | null>(null);
-  // onZipUpload conservé pour extension future, mais pas de stockage local nécessaire actuellement
-  const setUploadedZip = () => {
-    /* noop placeholder */
-  };
+  // Stocke le ZIP fourni par l'utilisateur pour contrôler l'accès à l'étape Paramètres
+  const [uploadedZip, setUploadedZip] = useState<File | null>(null);
   const [analysisResults, setAnalysisResults] = useState<StudentFolder[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3>(0);
@@ -20,18 +20,30 @@ export const Raisin: React.FC = () => {
     number | undefined
   >(undefined);
 
+  // Un modèle est considéré valide si la racine possède au moins un enfant
+  const isTemplateValid = React.useMemo(() => {
+    if (!currentTemplate) return false;
+    const rootId = currentTemplate.rootNodes[0];
+    if (!rootId) return false;
+    const rootNode = currentTemplate.nodes[rootId];
+    if (!rootNode) return false;
+    return rootNode.children.length > 0; // au moins un enfant direct
+  }, [currentTemplate]);
+
   const steps = [
     { id: 0, label: "Modèle" },
-    { id: 1, label: "ZIP", disabled: !currentTemplate },
-    { id: 2, label: "Paramètres", disabled: !currentTemplate },
+    // Étape ZIP désactivée tant que le modèle n'a pas au moins un enfant sous la racine
+    { id: 1, label: "ZIP", disabled: !isTemplateValid },
+    // Étape 2 bloquée tant qu'aucun zip valide n'est fourni (et modèle valide par transitivité car sinon on ne peut atteindre l'étape 1)
+    { id: 2, label: "Paramètres", disabled: !uploadedZip },
     { id: 3, label: "Résultats", disabled: analysisResults.length === 0 },
   ];
 
   const goTo = (id: number | string) => {
     const step = Number(id) as 0 | 1 | 2 | 3;
     // Validation
-    if (step === 1 && !currentTemplate) return;
-    if (step === 2 && !currentTemplate) return;
+    if (step === 1 && !isTemplateValid) return; // besoin d'un modèle valide
+    if (step === 2 && !uploadedZip) return; // zip requis
     if (step === 3 && analysisResults.length === 0) return;
     setCurrentStep(step);
   };
@@ -116,11 +128,18 @@ export const Raisin: React.FC = () => {
                 <h3 style={{ margin: 0, fontSize: "1rem" }}>
                   Configuration du modèle
                 </h3>
-                {currentTemplate && (
-                  <button className="btn btn-primary" onClick={() => goTo(1)}>
-                    Étape suivante
-                  </button>
-                )}
+                <button
+                  className="btn btn-primary"
+                  onClick={() => goTo(1)}
+                  disabled={!isTemplateValid}
+                  title={
+                    !isTemplateValid
+                      ? "Ajoutez au moins un nœud enfant à la racine pour continuer"
+                      : undefined
+                  }
+                >
+                  Étape suivante
+                </button>
               </div>
               <TemplateEditor
                 template={currentTemplate}
@@ -130,42 +149,35 @@ export const Raisin: React.FC = () => {
             </div>
           )}
           {currentStep === 1 && (
-            <ZipProcessor
+            <ZipUploadStep
               template={currentTemplate}
-              onZipUpload={setUploadedZip}
-              analysisResults={analysisResults}
-              onAnalysisComplete={setAnalysisResults}
-              isProcessing={isProcessing}
-              setIsProcessing={setIsProcessing}
-              mode="upload"
-              onRequestStepChange={(m) => {
-                if (m === "params") setCurrentStep(2);
+              onZipChosen={(file) => {
+                if (!file.name.toLowerCase().endsWith(".zip")) {
+                  alert("Fichier invalide : une archive .zip est requise");
+                  return;
+                }
+                setUploadedZip(file);
               }}
+              onNext={() => goTo(2)}
             />
           )}
           {currentStep === 2 && (
-            <ZipProcessor
+            <ParamsStep
               template={currentTemplate}
-              onZipUpload={setUploadedZip}
-              analysisResults={analysisResults}
+              zipFile={uploadedZip}
               onAnalysisComplete={setAnalysisResults}
-              isProcessing={isProcessing}
+              onNext={() => goTo(3)}
               setIsProcessing={setIsProcessing}
-              mode="params"
-              onRequestStepChange={(m) => {
-                if (m === "results") setCurrentStep(3);
-              }}
+              isProcessing={isProcessing}
             />
           )}
           {currentStep === 3 && (
-            <ZipProcessor
+            <ResultsStep
               template={currentTemplate}
-              onZipUpload={setUploadedZip}
               analysisResults={analysisResults}
-              onAnalysisComplete={setAnalysisResults}
-              isProcessing={isProcessing}
-              setIsProcessing={setIsProcessing}
-              mode="results"
+              onGenerateStandardizedZip={() => {
+                alert("Génération du ZIP standardisé - À implémenter");
+              }}
             />
           )}
         </div>
