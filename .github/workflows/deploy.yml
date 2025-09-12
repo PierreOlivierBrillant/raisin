@@ -1,0 +1,43 @@
+name: Déploiement
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build le site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          cache-dependency-path: "**/package-lock.json"
+          node-version: 20
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+      - name: Build du site
+        run: npm run build
+      - name: Téléverser l'artéfact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+  deploy:
+    name: Déployer le site
+    needs: build
+
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déploiement
+        id: deployment
+        uses: actions/deploy-pages@v4
