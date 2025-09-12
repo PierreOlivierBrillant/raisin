@@ -1,66 +1,60 @@
-# Raisin
+# Raisin – Guide d’utilisation rapide
 
-Application React + TypeScript (Vite) permettant :
+Raisin vous permet de :
 
-- de définir un modèle hiérarchique de dossiers/fichiers
-- d’exporter / importer ce modèle en YAML
-- d’analyser des archives ZIP (structure simulée pour l’instant)
+1. Définir un modèle (structure de dossiers/fichiers attendue)
+2. Analyser une archive ZIP contenant des remises d'étudiants
+3. Voir un score de correspondance par projet
+4. Ajuster les chemins proposés
+5. Générer une archive ZIP « standardisée »
 
-## Scripts
+Pour un guide détaillé utilisateur : voir `README.user.md` (version longue avec FAQ et exemples).
 
-```bash
-npm run dev       # serveur de développement (HMR)
-npm run build     # build production (pré-lint + tsc + vite)
-npm run preview   # prévisualisation du build
-npm run lint      # vérification ESLint
-npm run lint:fix  # vérification + corrections automatiques
-```
+---
 
-Le script `prebuild` lance automatiquement `npm run lint` avant le build.
+## Parcours en 4 étapes
 
-## Linting
+1. Construire le modèle (Étape "Modèle")
+2. Importer le ZIP (Étape "ZIP")
+3. Lancer l’analyse (Étape "Paramètres")
+4. Examiner les résultats (Étape "Résultats")
 
-Configuration basée sur:
+### Aperçu visuel
 
-- @eslint/js (recommandé)
-- typescript-eslint (config recommandée)
-- react-hooks (recommended-latest)
-- react-refresh (vite)
+| Étape         | Capture                                                  |
+| ------------- | -------------------------------------------------------- |
+| 1. Modèle     | ![Éditeur du modèle](docs/screenshots/modele.png)        |
+| 2. Import ZIP | ![Import du ZIP](docs/screenshots/import-zip.png)        |
+| 3. Paramètres | ![Paramètres d'analyse](docs/screenshots/parametres.png) |
+| 4. Résultats  | ![Résultats et scores](docs/screenshots/resultats.png)   |
 
-Améliorations possibles si besoin de règles plus strictes (type-aware) :
+---
 
-```js
-// Exemple (extrait) pour eslint.config.js
-// ...
-// remplacer tseslint.configs.recommended par :
-...tseslint.configs.recommendedTypeChecked,
-// ou version stricte :
-...tseslint.configs.strictTypeChecked,
-// éventuellement stylistique :
-...tseslint.configs.stylisticTypeChecked,
-```
+## Comprendre les scores
 
-Veiller alors à ajouter `parserOptions.project` pointant vers `tsconfig.app.json` et `tsconfig.node.json`.
+| Couleur | Signification                 |
+| ------- | ----------------------------- |
+| Vert    | ≥ 95% : quasi conforme        |
+| Orange  | 90–94% : divergences mineures |
+| Rouge   | < 90% : structure incomplète  |
 
-## Types
+---
 
-Barrel unique : `src/types/index.ts` (FileNode, HierarchyTemplate, CreateNodeOptions, YamlHierarchy, etc.).
+## Astuces rapides
 
-## Logique du modèle
+| Besoin                        | Action                               |
+| ----------------------------- | ------------------------------------ |
+| Sauvegarder un modèle         | Export YAML                          |
+| Repartir d’un modèle existant | Import YAML                          |
+| Améliorer un score faible     | Vérifier dossiers/fichiers manquants |
+| Normaliser un nom de projet   | Modifier le chemin avant génération  |
 
-`TemplateEditor.logic.ts` contient les opérations pures :
+---
 
-- création / mise à jour / suppression de nœuds
-- garantie de l’invariant racine (`ensureRootInvariant`)
-- sérialisation / désérialisation YAML (`toYamlHierarchy`, `fromYamlHierarchy`)
+## Fichier généré
 
-## Pistes futures
+Le fichier produit porte le nom par défaut `standardized.zip` et contient les dossiers renommés selon le modèle.
 
-- Tests unitaires sur la logique de hiérarchie
-- Analyse réelle d’archives ZIP + scoring
-- Internationalisation de l’UI
-- Règles ESLint strict type-aware
+---
 
-## Licence
-
-Projet privé (aucune licence explicite fournie pour l’instant).
+Bon usage de Raisin 🍇

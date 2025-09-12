@@ -1,80 +1,21 @@
-import React, { useEffect, useState, useMemo } from "react";
-import JSZip from "jszip";
+import React, { useState, useMemo } from "react";
 import { zipFolderPickerStyles as s } from "./ZipFolderPicker.styles";
-
-export interface ZipTreeNode {
-  name: string;
-  path: string; // chemin relatif racine ('' pour racine)
-  children: ZipTreeNode[];
-  type: "dir" | "file";
-}
+import { useZipTree } from "../../hooks/useZipTree";
+import type { ZipTreeNode } from "../../hooks/useZipTree";
+import { ZipBreadcrumb } from "./ZipBreadcrumb";
+import { ZipTreeView } from "./ZipTreeView";
 
 interface ZipFolderPickerProps {
   zipFile: File;
-  onSelect: (folderPath: string) => void; // '' représente racine
+  /** Callback appelée quand l'utilisateur sélectionne un dossier. */
+  onSelect: (folderPath: string) => void;
   title?: string;
-  // Mode inline : pas de dialogue, directement intégré dans l'UI
   inline?: boolean;
-  // Mode overlay (legacy) : conservé si besoin futur, fallback sur inline si non précisé
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-interface BuildingState {
-  status: "idle" | "loading" | "error" | "ready";
-  error?: string;
-}
-
-// Construit un arbre de répertoires à partir d'un objet JSZip
-function buildZipTree(zip: JSZip): ZipTreeNode {
-  const root: ZipTreeNode = { name: "/", path: "", children: [], type: "dir" };
-  const dirMap: Record<string, ZipTreeNode> = { "": root };
-
-  zip.forEach((relativePath, entry) => {
-    const parts = relativePath.split("/").filter(Boolean);
-    let currentPath = "";
-    let parent = root;
-    parts.forEach((segment, idx) => {
-      const isLast = idx === parts.length - 1;
-      if (isLast && !entry.dir) {
-        // fichier
-        parent.children.push({
-          name: segment,
-          path: currentPath ? currentPath + "/" + segment : segment,
-          // path complet (sans slash initial)
-          children: [],
-          type: "file",
-        });
-      } else {
-        // dossier
-        currentPath = currentPath ? currentPath + "/" + segment : segment;
-        if (!dirMap[currentPath]) {
-          const dirNode: ZipTreeNode = {
-            name: segment,
-            path: currentPath,
-            children: [],
-            type: "dir",
-          };
-          dirMap[currentPath] = dirNode;
-          parent.children.push(dirNode);
-        }
-        parent = dirMap[currentPath];
-      }
-    });
-  });
-
-  // Tri dossiers/fichiers
-  const sortRec = (node: ZipTreeNode) => {
-    node.children.sort((a, b) => {
-      if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
-    node.children.forEach(sortRec);
-  };
-  sortRec(root);
-  return root;
-}
-
+/** Sélecteur d'un dossier racine dans une archive ZIP analysée. */
 export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
   zipFile,
   onSelect,
@@ -83,12 +24,10 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
   isOpen = true,
   onClose,
 }) => {
-  const [tree, setTree] = useState<ZipTreeNode | null>(null);
-  const [state, setState] = useState<BuildingState>({ status: "idle" });
+  const { tree, status, error } = useZipTree(zipFile);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([""]));
   const [activePath, setActivePath] = useState<string>("");
   const [hasFocus, setHasFocus] = useState(false);
-  // Index des nœuds par chemin pour navigation clavier
   const nodeIndex = useMemo(() => {
     const map = new Map<string, ZipTreeNode>();
     const walk = (n: ZipTreeNode) => {
@@ -99,34 +38,7 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
     return map;
   }, [tree]);
 
-  useEffect(() => {
-    if (!inline && !isOpen) return;
-    let cancelled = false;
-    (async () => {
-      setState({ status: "loading" });
-      try {
-        const data = await zipFile.arrayBuffer();
-        const zip = await JSZip.loadAsync(data);
-        if (cancelled) return;
-        const t = buildZipTree(zip);
-        setTree(t);
-        setState({ status: "ready" });
-      } catch (e) {
-        console.error(e);
-        if (!cancelled)
-          setState({ status: "error", error: "Impossible de lire le ZIP" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [zipFile, isOpen, inline]);
-
-  const breadcrumb = useMemo(() => {
-    if (!activePath) return ["/"];
-    const parts = activePath.split("/");
-    return ["/", ...parts];
-  }, [activePath]);
+  const breadcrumbPath = activePath;
 
   const toggle = (path: string) => {
     setExpanded((prev) => {
@@ -137,7 +49,6 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
     });
   };
 
-  // Construit la liste linéaire des nœuds visibles selon l'état d'expansion
   const visibleNodes = useMemo(() => {
     if (!tree) return [] as ZipTreeNode[];
     const list: ZipTreeNode[] = [];
@@ -151,61 +62,6 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
     return list;
   }, [tree, expanded]);
 
-  const renderNode = (node: ZipTreeNode, depth = 0): React.ReactNode => {
-    const isDir = node.type === "dir";
-    const isExpanded = expanded.has(node.path);
-    const isActive = activePath === node.path;
-    return (
-      <div key={node.path || "/"}>
-        <div
-          style={{
-            ...s.nodeRow,
-            ...(isActive ? s.nodeRowActive : {}),
-            paddingLeft: depth * 14 + 6,
-          }}
-          onClick={() => {
-            if (isDir) {
-              setActivePath(node.path);
-              onSelect(node.path); // sélection sans toggle
-            }
-          }}
-          onDoubleClick={() => {
-            if (isDir) toggle(node.path);
-          }}
-        >
-          {isDir ? (
-            <button
-              type="button"
-              aria-label={isExpanded ? "Réduire" : "Développer"}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggle(node.path);
-              }}
-              style={{
-                ...s.disclosure,
-                cursor: "pointer",
-                background: "none",
-                border: "none",
-                padding: 0,
-                color: "inherit",
-                font: "inherit",
-                lineHeight: 1,
-              }}
-            >
-              {isExpanded ? "▾" : "▸"}
-            </button>
-          ) : (
-            <span style={s.disclosure}></span>
-          )}
-          <span>{node.name || "/"}</span>
-        </div>
-        {isDir &&
-          isExpanded &&
-          node.children.map((c) => renderNode(c, depth + 1))}
-      </div>
-    );
-  };
-
   if (!inline && !isOpen) return null;
 
   const content = (
@@ -217,31 +73,15 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
         flex: 1,
       }}
     >
-      <ul style={s.breadcrumb}>
-        {breadcrumb.map((segment, i) => {
-          const path = breadcrumb.slice(1, i + 1).join("/");
-          return (
-            <li key={i} style={s.breadcrumbItem}>
-              {i > 0 && <span style={{ opacity: 0.6 }}>/</span>}
-              <button
-                type="button"
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  margin: 0,
-                  cursor: "pointer",
-                  fontSize: ".65rem",
-                  color: "#2563eb",
-                }}
-                onClick={() => setActivePath(path)}
-              >
-                {segment === "/" ? "Racine" : segment}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <div style={s.breadcrumb}>
+        <ZipBreadcrumb
+          currentPath={breadcrumbPath}
+          onNavigate={(p) => {
+            setActivePath(p);
+            onSelect(p);
+          }}
+        />
+      </div>
       <div
         style={{
           ...s.inlineScrollArea,
@@ -319,21 +159,25 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
           }
         }}
       >
-        {state.status === "loading" && (
-          <p style={{ fontSize: ".7rem" }}>Analyse…</p>
+        {status === "loading" && <p style={{ fontSize: ".7rem" }}>Analyse…</p>}
+        {status === "error" && (
+          <p style={{ fontSize: ".7rem", color: "#b91c1c" }}>{error}</p>
         )}
-        {state.status === "error" && (
-          <p style={{ fontSize: ".7rem", color: "#b91c1c" }}>{state.error}</p>
+        {status === "ready" && tree && (
+          <ZipTreeView
+            root={tree}
+            currentPath={activePath}
+            onNavigate={(p) => {
+              setActivePath(p);
+              onSelect(p);
+            }}
+          />
         )}
-        {state.status === "ready" && tree && renderNode(tree)}
       </div>
     </div>
   );
 
-  if (inline) {
-    // Mode inline minimal : uniquement l'arborescence + dossier actif
-    return <>{content}</>;
-  }
+  if (inline) return <>{content}</>;
 
   return (
     <div style={s.overlay} role="dialog" aria-modal="true">

@@ -55,47 +55,7 @@ body.no-scroll {
   margin: 0 0 0.75rem; /* marge réduite */
 }
 
-.tabs {
-  display: flex;
-  width: 100%;
-  border-bottom: 2px solid #e5e7eb;
-  gap: 0.25rem;
-  padding: 0 2rem;
-  box-sizing: border-box;
-}
-.tab {
-  background: transparent;
-  border: 0;
-  padding: 0.75rem 1.25rem;
-  cursor: pointer;
-  font-weight: 500;
-  color: #6b7280;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  position: relative;
-  transition: color 0.2s;
-}
-.tab:focus,
-.tab:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-.tab.active {
-  color: #2563eb;
-}
-.tab.active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -2px;
-  height: 2px;
-  background: #2563eb;
-}
-.tab:hover {
-  color: #374151;
-}
+/* SUPPRIMÉ: styles .tabs / .tab obsolètes */
 .main-content {
   flex: 1;
   width: 100%;
@@ -201,14 +161,7 @@ body.no-scroll {
   color: #374151;
   margin: 0 0 0.35rem;
 }
-.checkbox-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: #374151;
-  cursor: pointer;
-}
+/* SUPPRIMÉ: .checkbox-row non utilisée */
 
 .v-stack {
   display: flex;
@@ -241,31 +194,7 @@ body.no-scroll {
   color: #991b1b;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 3rem 0;
-  color: #6b7280;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-.processing-state {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 0.5rem;
-  padding: 1.25rem;
-  text-align: center;
-}
-.spinner {
-  border: 2px solid #f3f4f6;
-  border-top: 2px solid #2563eb;
-  border-radius: 50%;
-  width: 2rem;
-  height: 2rem;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
+/* SUPPRIMÉ: .empty-state, .processing-state, .spinner non utilisés */
 @keyframes spin {
   0% {
     transform: rotate(0);
@@ -278,9 +207,6 @@ body.no-scroll {
 /* Template Editor */
 
 @media (max-width: 768px) {
-  .tabs {
-    flex-wrap: wrap;
-  }
   .app-header h1 {
     font-size: 1.4rem; /* encore plus compact sur mobile */
     margin-bottom: 0.5rem;
@@ -297,4 +223,33 @@ body.no-scroll {
 /* Utilitaire pour retirer la marge basse du dernier paragraphe */
 .no-last-mb p:last-child {
   margin-bottom: 0 !important;
+}
+
+/* Utilitaires génériques */
+.u-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.u-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+.u-badge-soft {
+  font-weight: 600;
+  font-size: 0.55rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 4px;
+}
+.u-progress-bar {
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.u-progress-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  transition: width 0.25s ease;
 }

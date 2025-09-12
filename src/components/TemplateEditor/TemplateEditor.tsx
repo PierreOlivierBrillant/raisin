@@ -3,8 +3,10 @@ import yaml from "js-yaml";
 import { GraphCanvas } from "./GraphCanvas/GraphCanvas";
 import { TemplateToolbar } from "./TemplateToolbar/TemplateToolbar";
 import { NodePanel } from "./NodePanel/NodePanel";
+import { LegendPalette } from "./LegendPalette";
 import type { HierarchyTemplate, YamlHierarchy } from "../../types";
 import { teStyles } from "./TemplateEditor.styles";
+import { useGraphHeight } from "../../hooks/useGraphHeight";
 import {
   createDefaultTemplate,
   ensureRootInvariant,
@@ -20,9 +22,11 @@ import type { PresetKey } from "./TemplatePresets";
 interface TemplateEditorProps {
   template: HierarchyTemplate | null;
   onTemplateChange: (template: HierarchyTemplate) => void;
-  forcedHeight?: number; // hauteur imposée par le parent (viewport calculé)
+  /** Hauteur imposée par le parent (ex: calcul plein écran). */
+  forcedHeight?: number;
 }
 
+/** Éditeur interactif de modèle hiérarchique (graph + panneau latéral). */
 export const TemplateEditor: React.FC<TemplateEditorProps> = ({
   template,
   onTemplateChange,
@@ -39,7 +43,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
   );
   const outerRef = useRef<HTMLDivElement | null>(null);
   const graphAreaRef = useRef<HTMLDivElement | null>(null);
-  const [graphHeight, setGraphHeight] = useState<number>(400);
+  const graphHeight = useGraphHeight([forcedHeight, template]);
 
   useEffect(() => {
     if (!template) onTemplateChange(createDefaultTemplate());
@@ -50,22 +54,6 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-
-  // Plus de calcul JS de hauteur : on laisse flex gérer.
-  // Re-calcul dédié pour la hauteur réelle du graph (plein écran disponible)
-  useEffect(() => {
-    const recompute = () => {
-      if (!graphAreaRef.current) return;
-      const rect = graphAreaRef.current.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const bottomPadding = 24; // petit buffer
-      const h = vh - rect.top - bottomPadding;
-      setGraphHeight(h > 400 ? h : 400);
-    };
-    recompute();
-    window.addEventListener("resize", recompute);
-    return () => window.removeEventListener("resize", recompute);
-  }, [forcedHeight]);
 
   useEffect(() => {
     if (!template || !selectedNode) return;
@@ -146,7 +134,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
   useEffect(() => {
     setLayoutVersion((v) => v + 1);
   }, [showPanel]);
-  const panelWidth = 340; // largeur cible px
+  const panelWidth = 340;
 
   return (
     <div
@@ -198,6 +186,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
               flexDirection: "column",
             }}
             ref={graphAreaRef}
+            data-graph-area
           >
             {template && (
               <GraphCanvas
@@ -223,80 +212,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                 pointerEvents: "none",
               }}
             >
-              <div
-                style={{
-                  background: "rgba(255,255,255,0.85)",
-                  backdropFilter: "blur(4px)",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: ".5rem",
-                  padding: ".4rem .55rem",
-                  display: "flex",
-                  gap: ".9rem",
-                  alignItems: "center",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
-                }}
-              >
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 3,
-                      background: "#EF4444",
-                      boxShadow: "0 0 0 2px #7F1D1D inset",
-                    }}
-                  />
-                  <span style={{ fontSize: ".65rem", color: "#374151" }}>
-                    Racine
-                  </span>
-                </span>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 3,
-                      background: "#3B82F6",
-                      boxShadow: "0 0 0 2px #1D4ED8 inset",
-                    }}
-                  />
-                  <span style={{ fontSize: ".65rem", color: "#374151" }}>
-                    Dossiers
-                  </span>
-                </span>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 3,
-                      background: "#10B981",
-                      boxShadow: "0 0 0 2px #047857 inset",
-                    }}
-                  />
-                  <span style={{ fontSize: ".65rem", color: "#374151" }}>
-                    Fichiers
-                  </span>
-                </span>
-              </div>
+              <LegendPalette />
             </div>
           </div>
           <div
@@ -374,6 +290,10 @@ interface AnimatedNodePanelProps {
   children: React.ReactNode;
 }
 
+/**
+ * Transitionne l'apparition/disparition d'un panneau latéral avec fade + slide.
+ * Monte/démonte réellement le contenu lorsque l'animation est terminée.
+ */
 const AnimatedNodePanel: React.FC<AnimatedNodePanelProps> = ({
   show,
   duration = 250,

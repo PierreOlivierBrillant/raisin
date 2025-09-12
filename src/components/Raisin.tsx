@@ -6,6 +6,7 @@ import { TemplateEditor } from "./TemplateEditor/TemplateEditor";
 import { Stepper } from "./Stepper/Stepper";
 import type { HierarchyTemplate, StudentFolder } from "../types";
 import "../styles/layout.css";
+import { useStepperState } from "../hooks/useStepperState";
 
 export const Raisin: React.FC = () => {
   const [currentTemplate, setCurrentTemplate] =
@@ -14,7 +15,9 @@ export const Raisin: React.FC = () => {
   const [uploadedZip, setUploadedZip] = useState<File | null>(null);
   const [analysisResults, setAnalysisResults] = useState<StudentFolder[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3>(0);
+  const { current: currentStep, goTo: internalGoTo } = useStepperState<
+    0 | 1 | 2 | 3
+  >(0);
   const templateCardRef = useRef<HTMLDivElement | null>(null);
   const [templateAreaHeight, setTemplateAreaHeight] = useState<
     number | undefined
@@ -41,11 +44,10 @@ export const Raisin: React.FC = () => {
 
   const goTo = (id: number | string) => {
     const step = Number(id) as 0 | 1 | 2 | 3;
-    // Validation
-    if (step === 1 && !isTemplateValid) return; // besoin d'un modèle valide
-    if (step === 2 && !uploadedZip) return; // zip requis
+    if (step === 1 && !isTemplateValid) return;
+    if (step === 2 && !uploadedZip) return;
     if (step === 3 && analysisResults.length === 0) return;
-    setCurrentStep(step);
+    internalGoTo(step);
   };
 
   // Désactive le scroll vertical quand on est sur l'étape 0 (éditeur plein écran vertical)

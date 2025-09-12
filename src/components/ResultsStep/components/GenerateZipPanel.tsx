@@ -1,6 +1,7 @@
 import React from "react";
 import { Download } from "lucide-react";
 import { resultsStyles } from "../ResultsStep.styles";
+import { ProgressBar } from "../../common/ProgressBar";
 
 interface GenerateZipPanelProps {
   isGenerating: boolean;
@@ -96,36 +97,7 @@ export const GenerateZipPanel: React.FC<GenerateZipPanelProps> = ({
             >
               {currentPath ? `Copie: ${currentPath}` : "Préparation..."}
             </div>
-            <div
-              style={{
-                height: 6,
-                background: "#e5e7eb",
-                borderRadius: 4,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: `${Math.min(100, Math.max(0, progress * 100)).toFixed(
-                    1
-                  )}%`,
-                  background: "linear-gradient(90deg,#10b981,#059669)",
-                  transition: "width .25s ease",
-                }}
-              />
-            </div>
-            <div
-              style={{
-                fontSize: ".55rem",
-                marginTop: 4,
-                textAlign: "right",
-                fontVariantNumeric: "tabular-nums",
-                opacity: 0.7,
-              }}
-            >
-              {(progress * 100).toFixed(1)}%
-            </div>
+            <ProgressBar value={progress} showPercent />
           </div>
         )}
       </div>
