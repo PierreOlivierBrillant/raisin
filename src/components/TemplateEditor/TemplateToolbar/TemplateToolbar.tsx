@@ -10,6 +10,10 @@ import mavenLogo from "../../../assets/maven.svg";
 import gradleLogo from "../../../assets/gradle.svg";
 import flutterLogo from "../../../assets/flutter.svg";
 import androidLogo from "../../../assets/android.svg";
+import laravelLogo from "../../../assets/laravel.svg";
+import djangoLogo from "../../../assets/django.svg";
+import railsLogo from "../../../assets/ruby.svg";
+import springBootLogo from "../../../assets/springboot.svg";
 
 interface TemplateToolbarProps {
   onExport: () => void;
@@ -85,6 +89,27 @@ export const TemplateToolbar: React.FC<TemplateToolbarProps> = ({
           logo={androidLogo}
           onClick={() => onAddPreset("android")}
         />
+        {/* Nouveaux presets */}
+        <PresetButton
+          label="Laravel"
+          logo={laravelLogo}
+          onClick={() => onAddPreset("laravel")}
+        />
+        <PresetButton
+          label="Django"
+          logo={djangoLogo}
+          onClick={() => onAddPreset("django")}
+        />
+        <PresetButton
+          label="Rails"
+          logo={railsLogo}
+          onClick={() => onAddPreset("rails")}
+        />
+        <PresetButton
+          label="Spring"
+          logo={springBootLogo}
+          onClick={() => onAddPreset("springboot" as PresetKey)}
+        />
       </div>
     </div>
   );
@@ -116,3 +141,5 @@ const PresetButton: React.FC<PresetButtonProps> = ({
     {label}
   </button>
 );
+
+// PresetTextButton supprimé (tous les presets ont maintenant une variante avec logo)

@@ -11,7 +11,11 @@ export type PresetKey =
   | "maven"
   | "gradle"
   | "flutter"
-  | "android";
+  | "android"
+  | "laravel"
+  | "django"
+  | "rails"
+  | "springboot";
 
 interface PresetEntry {
   path: string; // ex: "src/components" ou "src/App.tsx"
@@ -100,6 +104,46 @@ const androidPreset: PresetEntry[] = [
   { path: "app/src/main/AndroidManifest.xml", type: "file" },
 ];
 
+// Laravel typical structure
+const laravelPreset: PresetEntry[] = [
+  { path: "app", type: "directory" },
+  { path: "bootstrap", type: "directory" },
+  { path: "config", type: "directory" },
+  { path: "public", type: "directory" },
+  { path: "resources", type: "directory" },
+  { path: "resources/views", type: "directory" },
+  { path: "routes", type: "directory" },
+  { path: "routes/web.php", type: "file" },
+  { path: "storage", type: "directory" },
+  { path: "composer.json", type: "file" },
+  { path: "artisan", type: "file" },
+];
+
+// Django typical structure (wildcards pour le répertoire du projet principal)
+const djangoPreset: PresetEntry[] = [
+  { path: "requirements.txt", type: "file" },
+  { path: "templates", type: "directory" },
+  { path: "static", type: "directory" },
+];
+
+// Ruby on Rails typical structure
+const railsPreset: PresetEntry[] = [
+  { path: "app", type: "directory" },
+  { path: "Gemfile", type: "file" },
+  { path: "Rakefile", type: "file" },
+  { path: "config.ru", type: "file" },
+];
+
+// Spring Boot typical structure (Maven gradle agnostique, on cible les répertoires et fichiers clés)
+const springbootPreset: PresetEntry[] = [
+  { path: "pom.xml", type: "file" },
+  { path: "build.gradle", type: "file" }, // parfois présent selon l'outillage
+  { path: "src", type: "directory" },
+  { path: "src/main", type: "directory" },
+  { path: "src/main/java", type: "directory" },
+  { path: "src/main/resources/application.properties", type: "file" },
+];
+
 const PRESETS: Record<PresetKey, PresetEntry[]> = {
   react: reactPreset,
   angular: angularPreset,
@@ -109,6 +153,10 @@ const PRESETS: Record<PresetKey, PresetEntry[]> = {
   gradle: gradlePreset,
   flutter: flutterPreset,
   android: androidPreset,
+  laravel: laravelPreset,
+  django: djangoPreset,
+  rails: railsPreset,
+  springboot: springbootPreset,
 };
 
 /**

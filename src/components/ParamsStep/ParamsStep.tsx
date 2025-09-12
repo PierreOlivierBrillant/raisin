@@ -101,6 +101,33 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
         </div>
       </form>
       {/* Le picker est affiché inline plus haut */}
+      {isProcessing && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(255,255,255,0.65)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: ".7rem",
+            gap: ".5rem",
+          }}
+        >
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              border: "3px solid #d1d5db",
+              borderTopColor: "#2563eb",
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite",
+            }}
+          />
+          Analyse en cours…
+        </div>
+      )}
     </div>
   );
 };

@@ -175,16 +175,8 @@ export const Raisin: React.FC = () => {
             <ResultsStep
               template={currentTemplate}
               analysisResults={analysisResults}
+              zipFile={uploadedZip!}
               onResultsChange={(upd) => setAnalysisResults(upd)}
-              onGenerateStandardizedZip={(upd) => {
-                // Futur : utiliser upd pour créer une archive avec renommage
-                alert(
-                  `Génération du ZIP standardisé (mock) avec ${upd.reduce(
-                    (acc, s) => acc + s.projects.length,
-                    0
-                  )} projet(s).`
-                );
-              }}
             />
           )}
         </div>

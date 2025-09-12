@@ -87,6 +87,17 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
   const [state, setState] = useState<BuildingState>({ status: "idle" });
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([""]));
   const [activePath, setActivePath] = useState<string>("");
+  const [hasFocus, setHasFocus] = useState(false);
+  // Index des nœuds par chemin pour navigation clavier
+  const nodeIndex = useMemo(() => {
+    const map = new Map<string, ZipTreeNode>();
+    const walk = (n: ZipTreeNode) => {
+      map.set(n.path, n);
+      n.children.forEach(walk);
+    };
+    if (tree) walk(tree);
+    return map;
+  }, [tree]);
 
   useEffect(() => {
     if (!inline && !isOpen) return;
@@ -126,6 +137,20 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
     });
   };
 
+  // Construit la liste linéaire des nœuds visibles selon l'état d'expansion
+  const visibleNodes = useMemo(() => {
+    if (!tree) return [] as ZipTreeNode[];
+    const list: ZipTreeNode[] = [];
+    const walk = (n: ZipTreeNode) => {
+      list.push(n);
+      if (n.type === "dir" && expanded.has(n.path)) {
+        n.children.forEach(walk);
+      }
+    };
+    walk(tree);
+    return list;
+  }, [tree, expanded]);
+
   const renderNode = (node: ZipTreeNode, depth = 0): React.ReactNode => {
     const isDir = node.type === "dir";
     const isExpanded = expanded.has(node.path);
@@ -141,14 +166,37 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
           onClick={() => {
             if (isDir) {
               setActivePath(node.path);
-              onSelect(node.path); // sélection immédiate dossier
-              toggle(node.path);
+              onSelect(node.path); // sélection sans toggle
             }
           }}
+          onDoubleClick={() => {
+            if (isDir) toggle(node.path);
+          }}
         >
-          <span style={s.disclosure}>
-            {isDir ? (isExpanded ? "▾" : "▸") : ""}
-          </span>
+          {isDir ? (
+            <button
+              type="button"
+              aria-label={isExpanded ? "Réduire" : "Développer"}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle(node.path);
+              }}
+              style={{
+                ...s.disclosure,
+                cursor: "pointer",
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: "inherit",
+                font: "inherit",
+                lineHeight: 1,
+              }}
+            >
+              {isExpanded ? "▾" : "▸"}
+            </button>
+          ) : (
+            <span style={s.disclosure}></span>
+          )}
           <span>{node.name || "/"}</span>
         </div>
         {isDir &&
@@ -194,7 +242,83 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
           );
         })}
       </ul>
-      <div style={s.inlineScrollArea}>
+      <div
+        style={{
+          ...s.inlineScrollArea,
+          outline: hasFocus ? "2px solid #2563eb" : "none",
+          outlineOffset: 2,
+        }}
+        tabIndex={0}
+        onFocus={() => setHasFocus(true)}
+        onBlur={() => setHasFocus(false)}
+        onKeyDown={(e) => {
+          if (!tree) return;
+          const currentNode = nodeIndex.get(activePath) || tree;
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            if (currentNode.type === "dir" && expanded.has(currentNode.path)) {
+              toggle(currentNode.path);
+            } else {
+              if (currentNode.path.includes("/")) {
+                const parentPath = currentNode.path.slice(
+                  0,
+                  currentNode.path.lastIndexOf("/")
+                );
+                setActivePath(parentPath);
+                onSelect(parentPath);
+              } else if (currentNode.path !== "") {
+                setActivePath("");
+                onSelect("");
+              }
+            }
+          } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            if (currentNode.type === "dir") {
+              if (!expanded.has(currentNode.path)) {
+                toggle(currentNode.path);
+              } else if (currentNode.children.length) {
+                const firstChild = currentNode.children[0];
+                setActivePath(firstChild.path);
+                if (firstChild.type === "dir") onSelect(firstChild.path);
+              }
+            }
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            const idx = visibleNodes.findIndex(
+              (n) => n.path === currentNode.path
+            );
+            const nextNode = visibleNodes[idx + 1];
+            if (nextNode) {
+              setActivePath(nextNode.path);
+              if (nextNode.type === "dir") onSelect(nextNode.path);
+            }
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            const idx = visibleNodes.findIndex(
+              (n) => n.path === currentNode.path
+            );
+            const prevNode = visibleNodes[idx - 1];
+            if (prevNode) {
+              setActivePath(prevNode.path);
+              if (prevNode.type === "dir") onSelect(prevNode.path);
+            }
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            const first = visibleNodes[0];
+            if (first) {
+              setActivePath(first.path);
+              if (first.type === "dir") onSelect(first.path);
+            }
+          } else if (e.key === "End") {
+            e.preventDefault();
+            const last = visibleNodes[visibleNodes.length - 1];
+            if (last) {
+              setActivePath(last.path);
+              if (last.type === "dir") onSelect(last.path);
+            }
+          }
+        }}
+      >
         {state.status === "loading" && (
           <p style={{ fontSize: ".7rem" }}>Analyse…</p>
         )}
