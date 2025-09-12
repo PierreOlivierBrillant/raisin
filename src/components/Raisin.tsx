@@ -175,8 +175,15 @@ export const Raisin: React.FC = () => {
             <ResultsStep
               template={currentTemplate}
               analysisResults={analysisResults}
-              onGenerateStandardizedZip={() => {
-                alert("Génération du ZIP standardisé - À implémenter");
+              onResultsChange={(upd) => setAnalysisResults(upd)}
+              onGenerateStandardizedZip={(upd) => {
+                // Futur : utiliser upd pour créer une archive avec renommage
+                alert(
+                  `Génération du ZIP standardisé (mock) avec ${upd.reduce(
+                    (acc, s) => acc + s.projects.length,
+                    0
+                  )} projet(s).`
+                );
               }}
             />
           )}
