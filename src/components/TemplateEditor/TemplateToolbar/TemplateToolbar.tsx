@@ -89,7 +89,6 @@ export const TemplateToolbar: React.FC<TemplateToolbarProps> = ({
           logo={androidLogo}
           onClick={() => onAddPreset("android")}
         />
-        {/* Nouveaux presets */}
         <PresetButton
           label="Laravel"
           logo={laravelLogo}
@@ -130,16 +129,14 @@ const PresetButton: React.FC<PresetButtonProps> = ({
     onClick={onClick}
     className="btn btn-secondary btn-compact"
     title={`Remplacer par le preset ${label}`}
-    style={{ display: "flex", alignItems: "center", gap: 4 }}
+    style={templateToolbarStyles.presetButton}
   >
     <img
       src={logo}
       alt={label}
-      style={{ width: 14, height: 14, display: "block" }}
+      style={templateToolbarStyles.presetLogo}
       draggable={false}
     />
     {label}
   </button>
 );
-
-// PresetTextButton supprimé (tous les presets ont maintenant une variante avec logo)

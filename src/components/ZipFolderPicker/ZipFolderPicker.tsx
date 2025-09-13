@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { zipFolderPickerStyles as s } from "./ZipFolderPicker.styles";
+import { zipFolderPickerExtraStyles as xs } from "./ZipFolderPicker.extra.styles";
 import { useZipTree } from "../../hooks/useZipTree";
 import type { ZipTreeNode } from "../../hooks/useZipTree";
-import { ZipBreadcrumb } from "./ZipBreadcrumb";
-import { ZipTreeView } from "./ZipTreeView";
+import { ZipBreadcrumb } from "./ZipBreadcrumb/ZipBreadcrumb";
+import { ZipTreeView } from "./ZipTreeView/ZipTreeView";
 
 interface ZipFolderPickerProps {
   zipFile: File;
@@ -65,14 +66,7 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
   if (!inline && !isOpen) return null;
 
   const content = (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: ".5rem",
-        flex: 1,
-      }}
-    >
+    <div style={xs.container}>
       <div style={s.breadcrumb}>
         <ZipBreadcrumb
           currentPath={breadcrumbPath}
@@ -83,11 +77,7 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
         />
       </div>
       <div
-        style={{
-          ...s.inlineScrollArea,
-          outline: hasFocus ? "2px solid #2563eb" : "none",
-          outlineOffset: 2,
-        }}
+        style={{ ...s.inlineScrollArea, ...xs.focusableScroll(hasFocus) }}
         tabIndex={0}
         onFocus={() => setHasFocus(true)}
         onBlur={() => setHasFocus(false)}
@@ -159,10 +149,8 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
           }
         }}
       >
-        {status === "loading" && <p style={{ fontSize: ".7rem" }}>Analyse…</p>}
-        {status === "error" && (
-          <p style={{ fontSize: ".7rem", color: "#b91c1c" }}>{error}</p>
-        )}
+        {status === "loading" && <p style={xs.loading}>Analyse…</p>}
+        {status === "error" && <p style={xs.error}>{error}</p>}
         {status === "ready" && tree && (
           <ZipTreeView
             root={tree}

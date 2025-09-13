@@ -7,7 +7,7 @@ export const teStyles = {
     boxSizing: "border-box" as const,
   },
   sidePanelSlot: {
-    position: "relative",
+    position: "relative" as const,
     display: "flex",
     alignItems: "stretch",
   },
@@ -20,7 +20,7 @@ export const teStyles = {
   graphWrapper: {
     border: "1px solid #e5e7eb",
     borderRadius: ".5rem",
-    overflow: "hidden",
+    overflow: "hidden" as const,
     display: "flex",
     flexDirection: "column" as const,
     height: "100%",
@@ -39,4 +39,65 @@ export const teStyles = {
   smallGraph: {
     height: "400px",
   },
+  outer: {
+    position: "relative" as const,
+    display: "flex",
+    flexDirection: "column" as const,
+    width: "100%",
+    boxSizing: "border-box" as const,
+    flex: 1,
+    minHeight: 0,
+  },
+  toolbarWrapper: {
+    marginBottom: "0.5rem",
+  },
+  mainRow: {
+    display: "flex",
+    flex: 1,
+    minHeight: 0,
+    width: "100%",
+    alignItems: "stretch" as const,
+    gap: "0.5rem",
+    height: "100%",
+  },
+  graphArea: (graphHeight?: number) => ({
+    ...teStyles.graphWrapper,
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
+    height: graphHeight,
+    position: "relative" as const,
+    display: "flex",
+    flexDirection: "column" as const,
+  }),
+  legendAnchor: {
+    position: "absolute" as const,
+    bottom: 8,
+    right: 8,
+    pointerEvents: "none" as const,
+  },
+  sidePanel: (show: boolean, panelWidth: number) => ({
+    width: show ? panelWidth : 0,
+    transition: "width 240ms ease",
+    overflow: "hidden" as const,
+    display: "flex",
+    flexDirection: "column" as const,
+    minHeight: 0,
+    boxSizing: "border-box" as const,
+    paddingLeft: show ? "0.5rem" : 0,
+  }),
+  mobileWrapper: {
+    marginTop: "0.75rem",
+  },
+  animatedPanel: (visible: boolean, duration: number) => ({
+    transition: `opacity ${duration}ms ease, transform ${duration}ms ease`,
+    opacity: visible ? 1 : 0,
+    transform: visible ? "translateX(0)" : "translateX(12px)",
+    pointerEvents: (visible
+      ? "auto"
+      : "none") as React.CSSProperties["pointerEvents"],
+    height: "100%",
+    display: "flex",
+    flexDirection: "column" as const,
+  }),
 } as const;

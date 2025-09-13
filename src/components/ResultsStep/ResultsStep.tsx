@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import type { HierarchyTemplate, StudentFolder } from "../../types";
 import { resultsStyles } from "./ResultsStep.styles";
-import { GenerateZipPanel } from "./components/GenerateZipPanel";
-import { ProjectDetailsModal } from "./components/ProjectDetailsModal";
-import { StudentCard } from "./components/StudentCard";
+import { GenerateZipPanel } from "./GenerateZipPanel/GenerateZipPanel";
+import { ProjectDetailsModal } from "./ProjectDetailsModal/ProjectDetailsModal";
+import { StudentCard } from "./StudentCard/StudentCard";
 import { useGenerateZip } from "../../hooks/useGenerateZip";
 
 interface ResultsStepProps {

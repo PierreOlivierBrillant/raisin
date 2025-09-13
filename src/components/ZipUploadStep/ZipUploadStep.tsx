@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import type { HierarchyTemplate } from "../../types";
 import { zipUploadStyles } from "./ZipUploadStep.styles";
+import { zipUploadExtraStyles } from "./ZipUploadStep.extra.styles";
 
 interface ZipUploadStepProps {
   template: HierarchyTemplate | null;
@@ -39,7 +40,7 @@ export const ZipUploadStep: React.FC<ZipUploadStepProps> = ({
           onChange={handleFileUpload}
           hidden
         />
-        <div style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
+        <div style={zipUploadExtraStyles.actions}>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="btn btn-primary"
@@ -53,13 +54,7 @@ export const ZipUploadStep: React.FC<ZipUploadStepProps> = ({
           )}
         </div>
         {zipFile && (
-          <p
-            style={{
-              fontSize: ".75rem",
-              color: "#374151",
-              margin: "0.5rem 0 0",
-            }}
-          >
+          <p style={zipUploadExtraStyles.selectedFile}>
             Fichier sélectionné : <strong>{zipFile.name}</strong>
           </p>
         )}

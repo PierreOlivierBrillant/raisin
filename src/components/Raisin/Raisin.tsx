@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ZipUploadStep } from "./ZipUploadStep/ZipUploadStep";
-import { ParamsStep } from "./ParamsStep/ParamsStep";
-import { ResultsStep } from "./ResultsStep/ResultsStep";
-import { TemplateEditor } from "./TemplateEditor/TemplateEditor";
-import { Stepper } from "./Stepper/Stepper";
-import type { HierarchyTemplate, StudentFolder } from "../types";
-import "../styles/layout.css";
-import { useStepperState } from "../hooks/useStepperState";
+import { ZipUploadStep } from "../ZipUploadStep/ZipUploadStep";
+import { ParamsStep } from "../ParamsStep/ParamsStep";
+import { ResultsStep } from "../ResultsStep/ResultsStep";
+import { TemplateEditor } from "../TemplateEditor/TemplateEditor";
+import { Stepper } from "../Stepper/Stepper";
+import type { HierarchyTemplate, StudentFolder } from "../../types";
+import "../../styles/layout.css";
+import { useStepperState } from "../../hooks/useStepperState";
+import { raisinStyles } from "./Raisin.styles";
 
 export const Raisin: React.FC = () => {
   const [currentTemplate, setCurrentTemplate] =
     useState<HierarchyTemplate | null>(null);
-  // Stocke le ZIP fourni par l'utilisateur pour contrôler l'accès à l'étape Paramètres
   const [uploadedZip, setUploadedZip] = useState<File | null>(null);
   const [analysisResults, setAnalysisResults] = useState<StudentFolder[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -24,21 +24,18 @@ export const Raisin: React.FC = () => {
     number | undefined
   >(undefined);
 
-  // Un modèle est considéré valide si la racine possède au moins un enfant
   const isTemplateValid = React.useMemo(() => {
     if (!currentTemplate) return false;
     const rootId = currentTemplate.rootNodes[0];
     if (!rootId) return false;
     const rootNode = currentTemplate.nodes[rootId];
     if (!rootNode) return false;
-    return rootNode.children.length > 0; // au moins un enfant direct
+    return rootNode.children.length > 0;
   }, [currentTemplate]);
 
   const steps = [
     { id: 0, label: "Modèle" },
-    // Étape ZIP désactivée tant que le modèle n'a pas au moins un enfant sous la racine
     { id: 1, label: "ZIP", disabled: !isTemplateValid },
-    // Étape 2 bloquée tant qu'aucun zip valide n'est fourni (et modèle valide par transitivité car sinon on ne peut atteindre l'étape 1)
     { id: 2, label: "Paramètres", disabled: !uploadedZip },
     { id: 3, label: "Résultats", disabled: analysisResults.length === 0 },
   ];
@@ -69,15 +66,13 @@ export const Raisin: React.FC = () => {
     return () => document.body.classList.remove("no-scroll");
   }, [currentStep]);
 
-  // Calcule la hauteur disponible pour l'éditeur (vue full-height sans scroll interne)
   useEffect(() => {
     if (currentStep !== 0) return;
     const compute = () => {
       if (!templateCardRef.current) return;
       const rect = templateCardRef.current.getBoundingClientRect();
       const vh = window.innerHeight;
-      // On retire un petit buffer pour éviter un scroll (< 1px) + padding bas main-content (32px) + marge éventuelle
-      const bottomPadding = 40; // ajustable
+      const bottomPadding = 40;
       const h = vh - rect.top - bottomPadding;
       setTemplateAreaHeight(h > 300 ? h : 300);
     };
@@ -97,48 +92,17 @@ export const Raisin: React.FC = () => {
         <h1>Raisin 🍇</h1>
         <h2>Standardisateur de dossiers ZIP</h2>
       </header>
-      <main
-        className="main-content"
-        style={{ minHeight: 0, display: "flex", flexDirection: "column" }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
+      <main className="main-content" style={raisinStyles.main}>
+        <div style={raisinStyles.verticalStack}>
           <Stepper steps={steps} current={currentStep} onChange={goTo} />
           {currentStep === 0 && (
             <div
               className="card"
-              style={{
-                padding: "1rem",
-                marginBottom: 0,
-                display: "flex",
-                flexDirection: "column",
-                flex: 1,
-                minHeight: 0,
-                height: templateAreaHeight ? templateAreaHeight : undefined,
-                overflow: "hidden",
-              }}
+              style={raisinStyles.templateCard(templateAreaHeight)}
               ref={templateCardRef}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "1rem",
-                  flexWrap: "wrap",
-                  marginBottom: "1rem",
-                }}
-              >
-                <h3 style={{ margin: 0, fontSize: "1rem" }}>
-                  Configuration du modèle
-                </h3>
+              <div style={raisinStyles.templateHeaderRow}>
+                <h3 style={raisinStyles.h3}>Configuration du modèle</h3>
                 <button
                   className="btn btn-primary"
                   onClick={() => goTo(1)}

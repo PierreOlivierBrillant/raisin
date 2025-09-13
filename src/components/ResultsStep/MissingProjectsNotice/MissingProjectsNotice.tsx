@@ -1,4 +1,5 @@
 import React from "react";
+import { missingProjectsNoticeStyles as mpn } from "./MissingProjectsNotice.styles";
 
 interface MissingProjectsNoticeProps {
   missing: number;
@@ -12,21 +13,8 @@ export const MissingProjectsNotice: React.FC<MissingProjectsNoticeProps> = ({
 }) => {
   if (missing <= 0) return null;
   return (
-    <div
-      style={{
-        marginTop: ".25rem",
-        fontSize: ".55rem",
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        color: "#92400e",
-        background: "#fef3c7",
-        padding: ".25rem .45rem",
-        border: "1px solid #fcd34d",
-        borderRadius: 4,
-      }}
-    >
-      <strong style={{ fontWeight: 600 }}>{missing}</strong>
+    <div style={mpn.container}>
+      <strong style={mpn.strong}>{missing}</strong>
       projet(s) non trouvés sur {expected}
     </div>
   );

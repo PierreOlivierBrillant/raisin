@@ -64,7 +64,7 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: ".6rem" }}>
-          <label style={{ fontSize: ".8rem", fontWeight: 500 }}>
+          <label style={paramsStyles.label}>
             Dossier contenant les dossiers étudiants (sélectionnez dans
             l'arborescence)
           </label>
@@ -75,7 +75,7 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
               onSelect={(folderPath) => setStudentRootPath(folderPath)}
             />
           ) : (
-            <div style={{ fontSize: ".65rem", color: "#6b7280" }}>
+            <div style={paramsStyles.hint}>
               Téléversez un ZIP dans l'étape précédente pour explorer son
               contenu.
             </div>
@@ -83,7 +83,7 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
         </div>
         <div style={paramsStyles.inlineFields}>
           <div style={{ ...paramsStyles.formRow, flex: 1 }}>
-            <label style={{ fontSize: ".8rem", fontWeight: 500 }}>
+            <label style={paramsStyles.label}>
               Nombre de projets par étudiant
             </label>
             <input
@@ -95,9 +95,7 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
             />
           </div>
           <div style={{ ...paramsStyles.formRow, flex: 1 }}>
-            <label style={{ fontSize: ".8rem", fontWeight: 500 }}>
-              Seuil de similarité (%)
-            </label>
+            <label style={paramsStyles.label}>Seuil de similarité (%)</label>
             <input
               type="number"
               min={0}
@@ -108,7 +106,7 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
             />
           </div>
         </div>
-        <div style={{ display: "flex", gap: ".75rem", flexWrap: "wrap" }}>
+        <div style={paramsStyles.actionsRow}>
           <button
             type="submit"
             className="btn btn-primary"
@@ -118,31 +116,9 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
           </button>
         </div>
       </form>
-      {/* Le picker est affiché inline plus haut */}
       {isProcessing && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(255,255,255,0.65)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: ".7rem",
-            gap: ".5rem",
-          }}
-        >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              border: "3px solid #d1d5db",
-              borderTopColor: "#2563eb",
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-            }}
-          />
+        <div style={paramsStyles.overlay}>
+          <div style={paramsStyles.spinner} />
           Analyse en cours…
         </div>
       )}

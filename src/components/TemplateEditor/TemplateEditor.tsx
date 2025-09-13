@@ -3,7 +3,7 @@ import yaml from "js-yaml";
 import { GraphCanvas } from "./GraphCanvas/GraphCanvas";
 import { TemplateToolbar } from "./TemplateToolbar/TemplateToolbar";
 import { NodePanel } from "./NodePanel/NodePanel";
-import { LegendPalette } from "./LegendPalette";
+import { LegendPalette } from "./LegendPalette/LegendPalette";
 import type { HierarchyTemplate, YamlHierarchy } from "../../types";
 import { teStyles } from "./TemplateEditor.styles";
 import { useGraphHeight } from "../../hooks/useGraphHeight";
@@ -140,17 +140,11 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     <div
       ref={outerRef}
       style={{
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        boxSizing: "border-box",
-        flex: 1,
-        minHeight: 0,
+        ...teStyles.outer,
         height: forcedHeight ? forcedHeight : "100%",
       }}
     >
-      <div style={{ marginBottom: "0.5rem" }}>
+      <div style={teStyles.toolbarWrapper}>
         <TemplateToolbar
           onExport={exportTemplate}
           onImport={importTemplate}
@@ -163,28 +157,9 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
         />
       </div>
       {!isMobile && (
-        <div
-          style={{
-            display: "flex",
-            flex: 1,
-            minHeight: 0,
-            width: "100%",
-            alignItems: "stretch",
-            gap: "0.5rem",
-            height: "100%",
-          }}
-        >
+        <div style={teStyles.mainRow}>
           <div
-            style={{
-              ...teStyles.graphWrapper,
-              flex: 1,
-              minWidth: 0,
-              minHeight: 0,
-              height: graphHeight,
-              position: "relative",
-              display: "flex",
-              flexDirection: "column",
-            }}
+            style={teStyles.graphArea(graphHeight)}
             ref={graphAreaRef}
             data-graph-area
           >
@@ -204,28 +179,12 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                 layoutVersion={layoutVersion}
               />
             )}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 8,
-                right: 8,
-                pointerEvents: "none",
-              }}
-            >
+            <div style={teStyles.legendAnchor}>
               <LegendPalette />
             </div>
           </div>
           <div
-            style={{
-              width: showPanel ? panelWidth : 0,
-              transition: "width 240ms ease",
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              minHeight: 0,
-              boxSizing: "border-box",
-              paddingLeft: showPanel ? "0.5rem" : 0,
-            }}
+            style={teStyles.sidePanel(showPanel, panelWidth)}
             aria-hidden={!showPanel}
           >
             <AnimatedNodePanel show={showPanel} duration={240}>
@@ -253,7 +212,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
         </div>
       )}
       {isMobile && (
-        <div style={{ marginTop: "0.75rem" }}>
+        <div style={teStyles.mobileWrapper}>
           <AnimatedNodePanel show={showPanel} duration={240}>
             <NodePanel
               selectedNode={selectedNode}
@@ -312,18 +271,6 @@ const AnimatedNodePanel: React.FC<AnimatedNodePanelProps> = ({
 
   if (!render) return null;
   return (
-    <div
-      style={{
-        transition: `opacity ${duration}ms ease, transform ${duration}ms ease`,
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateX(0)" : "translateX(12px)",
-        pointerEvents: visible ? "auto" : "none",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {children}
-    </div>
+    <div style={teStyles.animatedPanel(visible, duration)}>{children}</div>
   );
 };

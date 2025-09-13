@@ -1,4 +1,5 @@
 import React from "react";
+import { modalStyles } from "./Modal.styles";
 
 interface ModalProps {
   onClose: () => void;
@@ -24,27 +25,14 @@ export const Modal: React.FC<ModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.35)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
+      style={{ ...modalStyles.overlay }}
       onClick={onClose}
     >
       <div
         style={{
-          background: "#fff",
+          ...modalStyles.container,
           width,
           maxHeight,
-          display: "flex",
-          flexDirection: "column",
-          borderRadius: 8,
-          boxShadow: "0 8px 28px -4px rgba(0,0,0,0.35)",
-          overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -53,3 +41,5 @@ export const Modal: React.FC<ModalProps> = ({
     </div>
   );
 };
+
+export default Modal;

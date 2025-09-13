@@ -434,7 +434,5 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     };
   }, [recenterRoot]);
 
-  return (
-    <svg ref={svgRef} style={{ ...graphCanvasStyles.svg, height: "100%" }} />
-  );
+  return <svg ref={svgRef} style={graphCanvasStyles.svg} />;
 };

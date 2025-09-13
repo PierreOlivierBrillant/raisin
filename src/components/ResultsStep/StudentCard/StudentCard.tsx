@@ -1,8 +1,9 @@
 import React from "react";
 import type { StudentFolder } from "../../../types";
-import { ProjectBlock } from "./ProjectBlock";
-import { scoreClass } from "../../ResultsStep/scoreClass";
-import { MissingProjectsNotice } from "./MissingProjectsNotice";
+import { ProjectBlock } from "../ProjectBlock/ProjectBlock";
+import { scoreClass } from "../scoreClass";
+import { MissingProjectsNotice } from "../MissingProjectsNotice/MissingProjectsNotice";
+import { studentCardStyles as scs } from "./StudentCard.styles";
 
 interface StudentCardProps {
   student: StudentFolder;
@@ -18,22 +19,9 @@ export const StudentCard: React.FC<StudentCardProps> = ({
 }) => {
   const badge = scoreClass(student.overallScore);
   return (
-    <div
-      style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: ".5rem",
-        padding: ".6rem .75rem",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          margin: "0 0 .4rem",
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: ".8rem" }}>{student.name}</h3>
+    <div style={scs.card}>
+      <div style={scs.header}>
+        <h3 style={scs.title}>{student.name}</h3>
         <span className={`badge ${badge}`}>{student.overallScore}%</span>
       </div>
       {student.expectedProjects !== undefined && (
@@ -43,9 +31,7 @@ export const StudentCard: React.FC<StudentCardProps> = ({
         />
       )}
       {student.projects.length === 0 && (
-        <p style={{ fontSize: ".6rem", margin: ".4rem 0 0" }}>
-          Aucun projet ≥ 90% trouvé.
-        </p>
+        <p style={scs.empty}>Aucun projet ≥ 90% trouvé.</p>
       )}
       {student.projects.map((project, pjIndex) => (
         <ProjectBlock

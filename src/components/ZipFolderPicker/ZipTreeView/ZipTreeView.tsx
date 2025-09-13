@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import type { ZipTreeNode } from "../../hooks/useZipTree";
+import type { ZipTreeNode } from "../../../hooks/useZipTree";
 
 interface ZipTreeViewProps {
   root: ZipTreeNode;
