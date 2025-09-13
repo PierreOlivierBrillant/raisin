@@ -18,6 +18,7 @@ export const Raisin: React.FC = () => {
   const { current: currentStep, goTo: internalGoTo } = useStepperState<
     0 | 1 | 2 | 3
   >(0);
+  const wasProcessingRef = useRef(false);
   const templateCardRef = useRef<HTMLDivElement | null>(null);
   const [templateAreaHeight, setTemplateAreaHeight] = useState<
     number | undefined
@@ -50,7 +51,15 @@ export const Raisin: React.FC = () => {
     internalGoTo(step);
   };
 
-  // Désactive le scroll vertical quand on est sur l'étape 0 (éditeur plein écran vertical)
+  useEffect(() => {
+    if (wasProcessingRef.current && !isProcessing) {
+      if (currentStep === 2 && analysisResults.length > 0) {
+        internalGoTo(3);
+      }
+    }
+    wasProcessingRef.current = isProcessing;
+  }, [isProcessing, analysisResults.length, currentStep, internalGoTo]);
+
   useEffect(() => {
     if (currentStep === 0) {
       document.body.classList.add("no-scroll");

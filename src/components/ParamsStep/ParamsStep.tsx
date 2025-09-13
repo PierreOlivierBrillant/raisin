@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { flushSync } from "react-dom"; // Assure l'application immédiate de l'état avant navigation
 import type { HierarchyTemplate, StudentFolder } from "../../types";
 import { analyzeZipStructureMock } from "../../services/analyzeZip";
 import { ZipFolderPicker } from "../ZipFolderPicker/ZipFolderPicker";
@@ -41,7 +42,9 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
         projectsPerStudent,
         similarityThreshold,
       });
-      onAnalysisComplete(results);
+      flushSync(() => {
+        onAnalysisComplete(results);
+      });
       onNext?.();
     } finally {
       setIsProcessing(false);
