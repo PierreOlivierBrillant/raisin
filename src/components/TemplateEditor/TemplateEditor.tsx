@@ -223,9 +223,6 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
               display: "flex",
               flexDirection: "column",
               minHeight: 0,
-              borderLeft: showPanel
-                ? "1px solid #e5e7eb"
-                : "1px solid transparent",
               boxSizing: "border-box",
               paddingLeft: showPanel ? "0.5rem" : 0,
             }}

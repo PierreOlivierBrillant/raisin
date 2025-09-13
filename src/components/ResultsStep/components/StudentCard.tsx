@@ -34,9 +34,7 @@ export const StudentCard: React.FC<StudentCardProps> = ({
         }}
       >
         <h3 style={{ margin: 0, fontSize: ".8rem" }}>{student.name}</h3>
-        <span className={`badge ${badge}`}>
-          {student.overallScore}% meilleur projet
-        </span>
+        <span className={`badge ${badge}`}>{student.overallScore}%</span>
       </div>
       {student.expectedProjects !== undefined && (
         <MissingProjectsNotice

@@ -35,7 +35,7 @@ Raisin vous aide à analyser un lot de projets étudiants contenus dans une arch
 ### Étape 4 – Résultats
 
 - Chaque étudiant apparaît avec :
-  - Son score global basé sur son meilleur projet.
+  - Son score global basé sur son projet ayant la meilleure correspondance avec le modèle choisi.
   - Un avertissement si des projets attendus manquent (si configuré).
   - Les projets Reconnu(s) : vous pouvez adapter le chemin de destination proposé.
 - Cliquez sur un projet pour voir les détails ( quels éléments du modèle ont été trouvés ou non ).
