@@ -9,7 +9,11 @@ import "../../styles/layout.css";
 import { useStepperState } from "../../hooks/useStepperState";
 import { raisinStyles } from "./Raisin.styles";
 
-export const Raisin: React.FC = () => {
+interface RaisinProps {
+  onBack?: () => void;
+}
+
+export const Raisin: React.FC<RaisinProps> = ({ onBack }) => {
   const [currentTemplate, setCurrentTemplate] =
     useState<HierarchyTemplate | null>(null);
   const [uploadedZip, setUploadedZip] = useState<File | null>(null);
@@ -88,7 +92,14 @@ export const Raisin: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-header" style={{ position: "relative" }}>
+        {onBack && (
+          <div style={{ position: "absolute", left: 16, top: 12 }}>
+            <button className="btn" onClick={onBack}>
+              &larr; Accueil
+            </button>
+          </div>
+        )}
         <h1>Raisin 🍇</h1>
         <h2>Standardisateur de dossiers ZIP</h2>
       </header>
