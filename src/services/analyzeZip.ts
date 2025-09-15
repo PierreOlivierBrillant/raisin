@@ -71,7 +71,7 @@ export async function analyzeZipWithReader(
         const parts = e.path.split("/");
         for (let i = 0; i < parts.length - 1; i++) {
           const d = parts.slice(0, i + 1).join("/");
-            ensureDir(d);
+          ensureDir(d);
         }
       }
     }
