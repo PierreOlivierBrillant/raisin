@@ -5,52 +5,52 @@ import type {
   StudentProject,
   MatchResult,
 } from "../types";
+import type { IZipReader } from "../types/zip";
 
 export interface AnalysisParams {
   template: HierarchyTemplate; // modèle de référence
-  zipFile: File; // archive fournie par l'utilisateur
+  zipFile: File; // archive fournie par l'utilisateur (WEB ONLY)
   studentRootPath: string; // chemin (dans le zip) du dossier contenant les dossiers étudiants ("" si racine)
   projectsPerStudent: number; // limite de projets à détecter
   similarityThreshold?: number; // pourcentage minimal (0-100) requis (défaut 90)
 }
 
+export interface ReaderAnalysisParams {
+  template: HierarchyTemplate;
+  reader: IZipReader; // abstraction (web ou desktop)
+  studentRootPath: string;
+  projectsPerStudent: number;
+  similarityThreshold?: number;
+  includeNestedZips?: boolean; // Desktop pourra déléguer côté Rust, sinon fallback client
+}
+
 /**
- * Analyse le ZIP pour détecter, pour chaque dossier étudiant (enfants directs de studentRootPath),
- * jusqu'à N projets dont la structure correspond au modèle à >= 90%.
- * La détection d'un projet consiste à chercher un sous-dossier dont au moins 90% des nœuds du modèle
- * (hors racine) peuvent être retrouvés en conservant l'organisation (présence des répertoires/fichiers attendus).
- * La similarité est calculée: (nœuds trouvés / total nœuds modèle non-racine)*100.
+ * Nouvelle version utilisant un IZipReader afin de ne pas forcer le chargement total du zip.
  */
-export async function analyzeZipStructureMock(
-  params: AnalysisParams
+export async function analyzeZipWithReader(
+  params: ReaderAnalysisParams
 ): Promise<StudentFolder[]> {
-  const { template, zipFile, studentRootPath, projectsPerStudent } = params;
+  const { template, reader, studentRootPath, projectsPerStudent } = params;
   const similarityThreshold = Math.min(
     100,
     Math.max(0, params.similarityThreshold ?? 90)
   );
-  const data = await zipFile.arrayBuffer();
-  const zip = await JSZip.loadAsync(data);
+  const includeNestedZips = params.includeNestedZips ?? true;
 
-  // Préfixe pratique pour filtrer les éléments sous le dossier racine des étudiants.
+  // listEntries doit être léger; sur Desktop on récupère déjà les dossiers / fichiers.
+  const baseEntries = await reader.listEntries();
+
+  interface ZipEntryMeta {
+    path: string;
+    isDir: boolean;
+  }
+  const entries: ZipEntryMeta[] = baseEntries.map((e) => ({
+    path: e.path.replace(/\\/g, "/").replace(/\/$/, ""),
+    isDir: e.isDir,
+  }));
+
   const studentDirPrefix = studentRootPath ? studentRootPath + "/" : "";
 
-  // Collecter tous les chemins de fichiers et dossiers dans le zip.
-  interface ZipEntryMeta {
-    path: string; // chemin normalisé sans slash final
-    isDir: boolean;
-    entry?: JSZip.JSZipObject; // référence brute pour fichiers (utile pour ZIP imbriqué)
-  }
-  const entries: ZipEntryMeta[] = [];
-  zip.forEach((relativePath, entry) => {
-    const clean = relativePath.replace(/\\/g, "/");
-    if (!clean) return;
-    const isDir = entry.dir;
-    const normalized = clean.endsWith("/") ? clean.slice(0, -1) : clean;
-    entries.push({ path: normalized, isDir, entry });
-  });
-
-  // Indexation rapide par dossier parent => enfants dirs
   const dirChildren: Record<string, Set<string>> = {};
   const fileSet = new Set<string>();
 
@@ -62,109 +62,41 @@ export async function analyzeZipStructureMock(
     if (!dirChildren[parent].has(path)) dirChildren[parent].add(path);
     if (!dirChildren[path]) dirChildren[path] = new Set();
   }
-
   function indexInitial(e: ZipEntryMeta) {
     if (e.isDir) {
       ensureDir(e.path);
     } else {
       fileSet.add(e.path);
-      // Créer chaînes de dossiers pour son parent (sinon parent isolé absent)
       if (e.path.includes("/")) {
         const parts = e.path.split("/");
         for (let i = 0; i < parts.length - 1; i++) {
           const d = parts.slice(0, i + 1).join("/");
-          ensureDir(d);
+            ensureDir(d);
         }
       }
     }
   }
-
   for (const e of entries) indexInitial(e);
 
-  // Exploration des ZIP imbriqués : on traite tout fichier *.zip sous le chemin racine étudiant.
-  const includeNestedZips = true; // activable/désactivable si besoin UI plus tard
-  async function expandNestedZips() {
-    if (!includeNestedZips) return;
-    const queue: { entry: JSZip.JSZipObject; virtualRoot: string }[] = [];
-    for (const e of entries) {
-      if (!e.isDir && /\.zip$/i.test(e.path)) {
-        // Limiter à la zone étudiante si précise
-        if (studentRootPath && !e.path.startsWith(studentDirPrefix)) continue;
-        const baseName = e.path.split("/").pop() || e.path;
-        const withoutExt = baseName.replace(/\.zip$/i, "");
-        const parent = e.path.includes("/")
-          ? e.path.slice(0, e.path.lastIndexOf("/"))
-          : "";
-        const virtualRoot = parent ? parent + "/" + withoutExt : withoutExt;
-        queue.push({ entry: e.entry!, virtualRoot });
-      }
-    }
-
-    while (queue.length) {
-      const { entry, virtualRoot } = queue.shift()!;
-      try {
-        const buf = await entry.async("arraybuffer");
-        const nested = await JSZip.loadAsync(buf);
-        // S'assurer que la racine virtuelle existe
-        ensureDir(virtualRoot);
-        nested.forEach((rel, nestedEntry) => {
-          const clean = rel.replace(/\\/g, "/");
-          if (!clean) return;
-          const normalized = clean.endsWith("/") ? clean.slice(0, -1) : clean;
-          if (!normalized) return; // évite ajouter racine vide
-          const fullPath = virtualRoot + "/" + normalized;
-          const isDir = nestedEntry.dir;
-          if (isDir) {
-            ensureDir(fullPath);
-          } else {
-            fileSet.add(fullPath);
-            // Créer hiérarchie de dossiers
-            if (fullPath.includes("/")) {
-              const parts = fullPath.split("/");
-              for (let i = 0; i < parts.length - 1; i++) {
-                const d = parts.slice(0, i + 1).join("/");
-                ensureDir(d);
-              }
-            }
-            if (/\.zip$/i.test(fullPath)) {
-              // ZIP imbriqué de niveau supplémentaire
-              const baseName2 = fullPath.split("/").pop() || fullPath;
-              const withoutExt2 = baseName2.replace(/\.zip$/i, "");
-              const parent2 = fullPath.includes("/")
-                ? fullPath.slice(0, fullPath.lastIndexOf("/"))
-                : "";
-              const virtualRoot2 = parent2
-                ? parent2 + "/" + withoutExt2
-                : withoutExt2;
-              queue.push({ entry: nestedEntry, virtualRoot: virtualRoot2 });
-            }
-          }
-        });
-      } catch {
-        // On ignore silencieusement un ZIP corrompu interne pour ne pas bloquer l'analyse.
-        // console.warn("Impossible de lire un ZIP imbriqué", err);
-      }
-    }
+  // NOTE: Expansion ZIP imbriqués côté abstraction => on ne développe plus ici (coût mémoire). Option: future impl.
+  if (includeNestedZips && reader.capabilities?.expandNestedZipsClientSide) {
+    // TODO: implémentation future si besoin côté web (reprendre logique précédente sélectivement)
   }
 
-  await expandNestedZips();
-
-  // Obtenir la liste des dossiers étudiants (enfants directs de studentRootPath)
   const studentDirs = Array.from(dirChildren[studentRootPath || ""] || [])
     .filter((d) => d.startsWith(studentDirPrefix))
-    .map((d) => d); // déjà chemins relatifs
+    .map((d) => d);
 
-  // Préparer la liste plate des nœuds modèle (hors racine) avec structure relative
   const rootId = template.rootNodes[0];
   const rootNode = template.nodes[rootId];
   if (!rootNode) return [];
 
   interface TemplateNodeInfo {
     id: string;
-    pathSegments: string[]; // segments relatifs sous racine modèle
-    name: string; // nom tel que dans le modèle (peut contenir wildcards)
+    pathSegments: string[];
+    name: string;
     type: "file" | "directory";
-    nameRegex?: RegExp; // regex compilée si wildcard présent
+    nameRegex?: RegExp;
   }
   const templateNodeInfos: TemplateNodeInfo[] = [];
   const stack = [...rootNode.children];
@@ -172,20 +104,18 @@ export async function analyzeZipStructureMock(
     const id = stack.pop()!;
     const n = template.nodes[id];
     if (!n) continue;
-    // path dans le modèle commence par 'Racine/...' => retirer le premier segment
     const fullSegs = n.path.split("/");
-    const segs = fullSegs.slice(1); // enlever 'Racine'
+    const segs = fullSegs.slice(1);
     let nameRegex: RegExp | undefined;
     if (/[*?]/.test(n.name)) {
-      // Transformer wildcard simple en regex ^...$
       const pattern = n.name
-        .replace(/[-/\\^$+?.()|[\]{}]/g, "\\$&") // échapper regex spéciaux
+        .replace(/[-/\\^$+?.()|[\]{}]/g, "\\$&")
         .replace(/\\\*/g, ".*")
         .replace(/\\\?/g, ".");
       try {
         nameRegex = new RegExp(`^${pattern}$`, "i");
       } catch {
-        nameRegex = undefined; // ignorer si échec
+        nameRegex = undefined;
       }
     }
     templateNodeInfos.push({
@@ -197,37 +127,26 @@ export async function analyzeZipStructureMock(
     });
     if (n.type === "directory") stack.push(...n.children);
   }
-  const totalTemplateNodes = templateNodeInfos.length || 1; // éviter division par 0
+  const totalTemplateNodes = templateNodeInfos.length || 1;
 
   function evaluateProjectCandidate(
     studentRoot: string,
     candidatePath: string
   ): StudentProject | null {
-    // candidatePath est un dossier sous le dossier de l'étudiant (ou plus profond) considéré comme racine projet.
-    // On reconstitue pour chaque nœud modèle le chemin attendu relatif à candidatePath.
     let matched = 0;
     const matchResults: MatchResult[] = [];
     for (const tni of templateNodeInfos) {
       const relative = tni.pathSegments.join("/");
-      const expectedDir = relative
-        ? candidatePath + "/" + relative
-        : candidatePath;
+      const expectedDir = relative ? candidatePath + "/" + relative : candidatePath;
       let status: MatchResult["status"] = "missing";
       let score = 0;
       let foundPath = "";
       if (tni.type === "directory") {
-        // Pour un dossier avec wildcard sur le dernier segment, tenter correspondance parmi enfants du parent
         const parentPath = expectedDir.includes("/")
           ? expectedDir.slice(0, expectedDir.lastIndexOf("/"))
           : "";
-        const segName = tni.pathSegments[tni.pathSegments.length - 1];
         if (tni.nameRegex) {
           const siblings = dirChildren[parentPath] || new Set();
-          for (const d of siblings) {
-            if (d.endsWith("/" + segName)) {
-              // ce cas est déjà exact; mais si wildcard, on veut matcher pattern sur le dernier segment réel
-            }
-          }
           for (const d of siblings) {
             const leaf = d.split("/").pop() || "";
             if (tni.nameRegex.test(leaf) && d === expectedDir) {
@@ -245,14 +164,12 @@ export async function analyzeZipStructureMock(
           foundPath = expectedDir;
         }
       } else {
-        const expectedFile = expectedDir; // même variable
+        const expectedFile = expectedDir;
         if (tni.nameRegex) {
-          // Chercher n'importe quel fichier dans le parent correspondant au pattern
           const parentPath = expectedFile.includes("/")
             ? expectedFile.slice(0, expectedFile.lastIndexOf("/"))
             : "";
           const parentPrefix = parentPath ? parentPath + "/" : "";
-          // parcourir fileSet pour ce parent (optimisable à l'avenir)
           for (const file of fileSet) {
             if (!file.startsWith(parentPrefix)) continue;
             const leaf = file.split("/").pop() || "";
@@ -274,8 +191,7 @@ export async function analyzeZipStructureMock(
       matchResults.push({ templateNodeId: tni.id, foundPath, score, status });
     }
     const similarity = Math.round((matched / totalTemplateNodes) * 100);
-    if (similarity < similarityThreshold) return null; // seuil dynamique
-    // Le nom du dossier de l'étudiant est le premier segment après studentRootPath
+    if (similarity < similarityThreshold) return null;
     const studentName = studentRoot
       .slice(studentDirPrefix.length)
       .split("/")[0];
@@ -294,9 +210,7 @@ export async function analyzeZipStructureMock(
 
   const results: StudentFolder[] = [];
   for (const studentDir of studentDirs) {
-    // Les sous-dossiers potentiels de projets sont tous les dossiers descendants de studentDir.
     const candidateProjects = new Map<string, StudentProject>();
-    // Collecter récursivement dossiers sous studentDir
     const stackDirs = [studentDir];
     const visited = new Set<string>();
     while (stackDirs.length) {
@@ -312,12 +226,9 @@ export async function analyzeZipStructureMock(
         if (pj) candidateProjects.set(current, pj);
       }
     }
-    // Trier par score desc puis prendre jusqu'à projectsPerStudent
     let picked = Array.from(candidateProjects.values()).sort(
       (a, b) => b.score - a.score
     );
-    // Filtrer doublons parent/enfant: garder le plus profond OU meilleur score.
-    // Stratégie: itérer du meilleur score au moins bon, garder si aucun projet déjà retenu n'est ancêtre ou descendant.
     const filtered: StudentProject[] = [];
     const isAncestor = (a: string, b: string) => b.startsWith(a + "/");
     for (const pj of picked) {
@@ -328,7 +239,6 @@ export async function analyzeZipStructureMock(
             isAncestor(pj.projectRootPath, kept.projectRootPath)
         )
       ) {
-        // Conflit ancêtre/descendant -> on garde celui déjà présent (car meilleur score) et on ignore ce pj
         continue;
       }
       filtered.push(pj);
@@ -336,7 +246,6 @@ export async function analyzeZipStructureMock(
     }
     picked = filtered;
     const overall = picked.length ? picked[0].score : 0;
-    // Pour rétrocompatibilité, on peuple matches avec le premier projet (sinon vide)
     const legacyMatches = picked.length ? picked[0].templateMatches : [];
     results.push({
       name: studentDir.slice(studentDirPrefix.length),
@@ -347,21 +256,13 @@ export async function analyzeZipStructureMock(
     });
   }
 
-  // Stratégie de nommage améliorée :
-  // 1. Calcul du préfixe commun et du suffixe commun entre tous les chemins relatifs d'un étudiant.
-  // 2. Le nom détaillé = segments entre ces deux zones (zone « variable »). Exemple :
-  //    A/B/C1/X et A/B/C2/X  => prefix commun [A,B], suffixe commun [X] => variable = [C1] / [C2].
-  // 3. Si la zone variable est vide (chemins quasi identiques), on prend le dernier segment du chemin.
-  // 4. Si collisions persistent, on élargit en ajoutant des segments autour (en remontant côté préfixe puis côté suffixe)
-  //    jusqu'à unicité ou épuisement, sinon suffixe numérique.
-  // Utilitaire de normalisation (accents -> ASCII, non alphanum -> _ , trim / collapse _ )
   function slugify(input: string): string {
     const ascii = input
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // diacritiques
-      .replace(/[^A-Za-z0-9]+/g, "_") // blocs non alphanum
-      .replace(/_+/g, "_") // underscores multiples
-      .replace(/^_+|_+$/g, "") // trim
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z0-9]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
       .toLowerCase();
     return ascii || "item";
   }
@@ -527,4 +428,36 @@ export async function analyzeZipStructureMock(
   // Tri résultat par nom étudiant
   results.sort((a, b) => a.name.localeCompare(b.name));
   return results;
+}
+
+/**
+ * Wrapper historique web (charge entièrement en mémoire) à déprécier pour gros ZIP.
+ */
+export async function analyzeZipStructureMock(
+  params: AnalysisParams
+): Promise<StudentFolder[]> {
+  const { template, zipFile, studentRootPath, projectsPerStudent } = params;
+  const reader: IZipReader = {
+    kind: 'jszip',
+    listEntries: async () => {
+      const data = await zipFile.arrayBuffer();
+      const zip = await JSZip.loadAsync(data);
+      const out: { path: string; isDir: boolean }[] = [];
+      zip.forEach((relativePath, entry) => {
+        const clean = relativePath.replace(/\\/g, "/");
+        if (!clean) return;
+        const normalized = clean.endsWith("/") ? clean.slice(0, -1) : clean;
+        out.push({ path: normalized, isDir: entry.dir });
+      });
+      return out;
+    },
+    capabilities: { expandNestedZipsClientSide: true }
+  };
+  return analyzeZipWithReader({
+    template,
+    reader,
+    studentRootPath,
+    projectsPerStudent,
+    similarityThreshold: params.similarityThreshold,
+  });
 }
