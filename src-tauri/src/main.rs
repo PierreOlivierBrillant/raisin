@@ -3,13 +3,13 @@
 
 use serde::Serialize;
 use std::{fs, path::PathBuf, collections::HashSet};
-use tauri::State;
 use zip::ZipArchive;
 
 #[derive(Serialize)]
 struct ZipEntryMeta {
   path: String,
-  isDir: bool,
+  #[serde(rename = "isDir")] // compatibilité avec frontend existant
+  is_dir: bool,
   size: Option<u64>,
 }
 
@@ -46,12 +46,17 @@ fn list_entries(path: String) -> Result<Vec<ZipEntryMeta>, String> {
             if parts_iter.len() > 1 { parts_iter.pop(); }
             for i in 0..parts_iter.len() { let d = parts_iter[0..=i].join("/"); dir_set.insert(d); }
         }
-        out.push(ZipEntryMeta { path: name_no_trailing, isDir: is_dir, size: if is_dir { None } else { Some(file.size()) } });
+  out.push(ZipEntryMeta { path: name_no_trailing, is_dir: is_dir, size: if is_dir { None } else { Some(file.size()) } });
       }
     }
     // Ajouter dossiers manquants (ceux qui n'étaient pas explicitement marqués directory dans l'archive)
-    let existing_dirs: HashSet<&str> = out.iter().filter(|e| e.isDir).map(|e| e.path.as_str()).collect();
-    for d in dir_set { if !existing_dirs.contains(d.as_str()) { out.push(ZipEntryMeta { path: d, isDir: true, size: None }); } }
+    // Collecte des dossiers existants sous forme de String pour éviter l'emprunt prolongé de 'out'
+  let existing_dirs: HashSet<String> = out.iter().filter(|e| e.is_dir).map(|e| e.path.clone()).collect();
+    for d in dir_set {
+      if !existing_dirs.contains(&d) {
+  out.push(ZipEntryMeta { path: d, is_dir: true, size: None });
+      }
+    }
     return Ok(out);
   }
 
@@ -69,7 +74,7 @@ fn list_entries(path: String) -> Result<Vec<ZipEntryMeta>, String> {
         if !rel_str.is_empty() {
           out.push(ZipEntryMeta { 
             path: rel_str.trim_end_matches('/').to_string(),
-            isDir: is_dir,
+            is_dir: is_dir,
             size: if is_dir { None } else { Some(meta.len()) }
           });
         }
@@ -78,7 +83,7 @@ fn list_entries(path: String) -> Result<Vec<ZipEntryMeta>, String> {
   } else {
     // Fichier non-zip: retourner simple entrée
     let meta = fs::metadata(&pb).map_err(|e| e.to_string())?;
-    out.push(ZipEntryMeta { path: pb.file_name().unwrap().to_string_lossy().into(), isDir: false, size: Some(meta.len()) });
+  out.push(ZipEntryMeta { path: pb.file_name().unwrap().to_string_lossy().into(), is_dir: false, size: Some(meta.len()) });
   }
   Ok(out)
 }
