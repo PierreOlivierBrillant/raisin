@@ -34,8 +34,6 @@ const reactPreset: PresetEntry[] = [
 const angularPreset: PresetEntry[] = [
   { path: "src", type: "directory" },
   { path: "src/app", type: "directory" },
-  { path: "src/app/app.component.ts", type: "file" },
-  { path: "src/app/app.module.ts", type: "file" },
   { path: "angular.json", type: "file" },
   { path: "package.json", type: "file" },
   { path: "tsconfig.json", type: "file" },
@@ -51,12 +49,7 @@ const vuePreset: PresetEntry[] = [
   { path: "vite.config.ts", type: "file" },
 ];
 
-const dotnetPreset: PresetEntry[] = [
-  { path: "*", type: "directory" },
-  { path: "*/Program.cs", type: "file" },
-  { path: "*/*.csproj", type: "file" },
-  { path: "*.sln", type: "file" },
-];
+const dotnetPreset: PresetEntry[] = [{ path: "*.sln", type: "file" }];
 
 const mavenPreset: PresetEntry[] = [
   { path: "pom.xml", type: "file" },
@@ -70,16 +63,11 @@ const mavenPreset: PresetEntry[] = [
 ];
 
 const gradlePreset: PresetEntry[] = [
-  { path: "settings.gradle", type: "file" },
-  { path: "build.gradle", type: "file" },
-  { path: "gradle.properties", type: "file" },
+  { path: "settings.gradle*", type: "file" },
+  { path: "build.gradle*", type: "file" },
   { path: "src", type: "directory" },
   { path: "src/main", type: "directory" },
-  { path: "src/main/java", type: "directory" },
-  { path: "src/main/resources", type: "directory" },
-  { path: "src/test", type: "directory" },
-  { path: "src/test/java", type: "directory" },
-  { path: "src/test/resources", type: "directory" },
+  { path: "src/main/*", type: "directory" },
 ];
 
 // Flutter typical project layout

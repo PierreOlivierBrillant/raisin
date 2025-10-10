@@ -3,11 +3,12 @@ import { zipFolderPickerStyles as s } from "./ZipFolderPicker.styles";
 import { zipFolderPickerExtraStyles as xs } from "./ZipFolderPicker.extra.styles";
 import { useZipTree } from "../../hooks/useZipTree";
 import type { ZipTreeNode } from "../../hooks/useZipTree";
+import type { ZipSource } from "../../types/zip";
 import { ZipBreadcrumb } from "./ZipBreadcrumb/ZipBreadcrumb";
 import { ZipTreeView } from "./ZipTreeView/ZipTreeView";
 
 interface ZipFolderPickerProps {
-  zipFile: File;
+  zipSource: ZipSource;
   /** Callback appelée quand l'utilisateur sélectionne un dossier. */
   onSelect: (folderPath: string) => void;
   title?: string;
@@ -18,14 +19,14 @@ interface ZipFolderPickerProps {
 
 /** Sélecteur d'un dossier racine dans une archive ZIP analysée. */
 export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
-  zipFile,
+  zipSource,
   onSelect,
   title = "Sélection du dossier racine",
   inline = false,
   isOpen = true,
   onClose,
 }) => {
-  const { tree, status, error } = useZipTree(zipFile);
+  const { tree, status, error } = useZipTree(zipSource);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([""]));
   const [activePath, setActivePath] = useState<string>("");
   const [hasFocus, setHasFocus] = useState(false);

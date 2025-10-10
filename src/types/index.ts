@@ -5,3 +5,18 @@ export type { MatchResult } from "./MatchResult";
 export type { StudentFolder, StudentProject } from "./StudentFolder";
 export type { CreateNodeOptions } from "./CreateNodeOptions";
 export type { YamlHierarchy, YamlNode } from "./YamlHierarchy";
+export type {
+  CommandeurOperation,
+  CommandeurWorkflow,
+  CommandeurExecutionLogEntry,
+  CommandeurExecutionResult,
+  CommandeurValidationContext,
+  CommandeurValidationMessage,
+  CommandeurOperationKind,
+  CommandeurWorkspaceSummary,
+} from "./Commandeur";
+export {
+  CommandeurOperationSchema,
+  CommandeurWorkflowSchema,
+  CommandeurValidationLevel,
+} from "./Commandeur";

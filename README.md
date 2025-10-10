@@ -57,4 +57,16 @@ Le fichier produit porte le nom par défaut `standardized.zip` et contient les d
 
 ---
 
+## Commandeur (desktop)
+
+La version desktop inclut un espace **Commandeur** qui accompagne désormais le parcours suivant :
+
+1. Préparer un workspace à partir d'un dossier ou d'une archive ZIP locale.
+2. Importer un workflow YAML, obtenir les messages de validation et corriger les avertissements éventuels.
+3. Exécuter le workflow avec suivi des logs, avertissements et erreurs consolidés.
+
+Les opérations sont orchestrées via l'API Tauri pour accéder au système de fichiers local en respectant l'allowlist de sécurité.
+
+---
+
 Bon usage de Raisin 🍇

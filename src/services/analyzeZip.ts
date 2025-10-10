@@ -1,4 +1,3 @@
-import JSZip from "jszip";
 import type {
   HierarchyTemplate,
   StudentFolder,
@@ -6,6 +5,8 @@ import type {
   MatchResult,
 } from "../types";
 import type { IZipReader } from "../types/zip";
+import { collectEntriesFromJSZip } from "./zipEntryUtils";
+import type { ZipSource } from "../types/zip";
 
 export interface AnalysisParams {
   template: HierarchyTemplate; // modèle de référence
@@ -13,6 +14,14 @@ export interface AnalysisParams {
   studentRootPath: string; // chemin (dans le zip) du dossier contenant les dossiers étudiants ("" si racine)
   projectsPerStudent: number; // limite de projets à détecter
   similarityThreshold?: number; // pourcentage minimal (0-100) requis (défaut 90)
+}
+
+export interface ZipStructureAnalysisParams {
+  template: HierarchyTemplate;
+  zipSource: ZipSource;
+  studentRootPath: string;
+  projectsPerStudent: number;
+  similarityThreshold?: number;
 }
 
 export interface ReaderAnalysisParams {
@@ -37,55 +46,87 @@ export async function analyzeZipWithReader(
   );
   const includeNestedZips = params.includeNestedZips ?? true;
 
-  // listEntries doit être léger; sur Desktop on récupère déjà les dossiers / fichiers.
   const baseEntries = await reader.listEntries();
 
   interface ZipEntryMeta {
     path: string;
     isDir: boolean;
   }
-  const entries: ZipEntryMeta[] = baseEntries.map((e) => ({
-    path: e.path.replace(/\\/g, "/").replace(/\/$/, ""),
-    isDir: e.isDir,
-  }));
 
-  const studentDirPrefix = studentRootPath ? studentRootPath + "/" : "";
+  const entries: ZipEntryMeta[] = baseEntries
+    .map((entry) => ({
+      path: entry.path.replace(/\\/g, "/").replace(/\/$/, ""),
+      isDir: entry.isDir,
+    }))
+    .filter((entry) => entry.path !== "");
+
+  let effectiveRoot = studentRootPath.replace(/^\/+|\/+$/g, "");
+  if (effectiveRoot === ".") effectiveRoot = "";
+  if (
+    effectiveRoot &&
+    !entries.some(
+      (e) => e.path === effectiveRoot || e.path.startsWith(`${effectiveRoot}/`)
+    )
+  ) {
+    effectiveRoot = "";
+  }
+  const studentDirPrefix = effectiveRoot ? `${effectiveRoot}/` : "";
 
   const dirChildren: Record<string, Set<string>> = {};
+  const filesByDir: Record<string, Set<string>> = {};
   const fileSet = new Set<string>();
 
   function ensureDir(path: string) {
+    if (!dirChildren[path]) dirChildren[path] = new Set();
+    if (path === "") return;
     const parent = path.includes("/")
       ? path.slice(0, path.lastIndexOf("/"))
       : "";
     if (!dirChildren[parent]) dirChildren[parent] = new Set();
-    if (!dirChildren[parent].has(path)) dirChildren[parent].add(path);
-    if (!dirChildren[path]) dirChildren[path] = new Set();
+    dirChildren[parent].add(path);
   }
-  function indexInitial(e: ZipEntryMeta) {
-    if (e.isDir) {
-      ensureDir(e.path);
+
+  function registerFile(path: string) {
+    fileSet.add(path);
+    const parts = path.split("/");
+    let current = "";
+    for (let i = 0; i < parts.length - 1; i++) {
+      current = current ? `${current}/${parts[i]}` : parts[i];
+      ensureDir(current);
+    }
+    const parent = parts.length > 1 ? parts.slice(0, -1).join("/") : "";
+    if (!filesByDir[parent]) filesByDir[parent] = new Set();
+    filesByDir[parent].add(path);
+  }
+
+  for (const entry of entries) {
+    if (entry.isDir) {
+      ensureDir(entry.path);
     } else {
-      fileSet.add(e.path);
-      if (e.path.includes("/")) {
-        const parts = e.path.split("/");
-        for (let i = 0; i < parts.length - 1; i++) {
-          const d = parts.slice(0, i + 1).join("/");
-          ensureDir(d);
-        }
-      }
+      registerFile(entry.path);
     }
   }
-  for (const e of entries) indexInitial(e);
 
-  // NOTE: Expansion ZIP imbriqués côté abstraction => on ne développe plus ici (coût mémoire). Option: future impl.
-  if (includeNestedZips && reader.capabilities?.expandNestedZipsClientSide) {
-    // TODO: implémentation future si besoin côté web (reprendre logique précédente sélectivement)
+  if (!dirChildren[effectiveRoot || ""]) {
+    dirChildren[effectiveRoot || ""] = new Set();
   }
 
-  const studentDirs = Array.from(dirChildren[studentRootPath || ""] || [])
-    .filter((d) => d.startsWith(studentDirPrefix))
-    .map((d) => d);
+  if (includeNestedZips && reader.capabilities?.expandNestedZipsClientSide) {
+    // Prévu pour implémentation future côté web si nécessaire.
+  }
+
+  const topLevelCandidates = new Set<string>(
+    Array.from(dirChildren[effectiveRoot || ""] || [])
+  );
+  for (const filePath of fileSet) {
+    if (!filePath.startsWith(studentDirPrefix)) continue;
+    const relative = filePath.slice(studentDirPrefix.length);
+    if (!relative.includes("/")) continue; // ignorer les fichiers au niveau racine
+    const segment = relative.split("/")[0];
+    if (!segment) continue;
+    const inferred = effectiveRoot ? `${effectiveRoot}/${segment}` : segment;
+    topLevelCandidates.add(inferred);
+  }
 
   const rootId = template.rootNodes[0];
   const rootNode = template.nodes[rootId];
@@ -94,117 +135,183 @@ export async function analyzeZipWithReader(
   interface TemplateNodeInfo {
     id: string;
     pathSegments: string[];
-    name: string;
     type: "file" | "directory";
-    nameRegex?: RegExp;
+    segmentMatchers: RegExp[];
   }
+
+  const makeSegmentRegex = (segment: string) => {
+    const escaped = segment.replace(/([.+^${}()|[\]\\])/g, "\\$1");
+    const pattern = escaped.replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]");
+    return new RegExp(`^${pattern}$`, "i");
+  };
+
   const templateNodeInfos: TemplateNodeInfo[] = [];
   const stack = [...rootNode.children];
   while (stack.length) {
     const id = stack.pop()!;
-    const n = template.nodes[id];
-    if (!n) continue;
-    const fullSegs = n.path.split("/");
-    const segs = fullSegs.slice(1);
-    let nameRegex: RegExp | undefined;
-    if (/[*?]/.test(n.name)) {
-      const pattern = n.name
-        .replace(/[-/\\^$+?.()|[\]{}]/g, "\\$&")
-        .replace(/\\\*/g, ".*")
-        .replace(/\\\?/g, ".");
-      try {
-        nameRegex = new RegExp(`^${pattern}$`, "i");
-      } catch {
-        nameRegex = undefined;
-      }
-    }
+    const node = template.nodes[id];
+    if (!node) continue;
+    const segments = node.path.split("/").slice(1);
     templateNodeInfos.push({
-      id: n.id,
-      pathSegments: segs,
-      name: n.name,
-      type: n.type,
-      nameRegex,
+      id: node.id,
+      pathSegments: segments,
+      type: node.type,
+      segmentMatchers: segments.map((seg) => makeSegmentRegex(seg)),
     });
-    if (n.type === "directory") stack.push(...n.children);
+    if (node.type === "directory") stack.push(...node.children);
   }
+
+  const literalRootSegments = new Set<string>();
+  for (const info of templateNodeInfos) {
+    if (!info.pathSegments.length) continue;
+    const firstSegment = info.pathSegments[0];
+    if (!firstSegment) continue;
+    if (firstSegment.includes("*") || firstSegment.includes("?")) continue;
+    literalRootSegments.add(firstSegment.toLowerCase());
+  }
+
+  const studentDirSet = new Set<string>();
+  for (const candidate of topLevelCandidates) {
+    if (!candidate.startsWith(studentDirPrefix)) continue;
+    const relative = studentDirPrefix
+      ? candidate.slice(studentDirPrefix.length)
+      : candidate;
+    const firstSegment = relative.split("/")[0]?.toLowerCase() ?? "";
+    if (firstSegment && literalRootSegments.has(firstSegment)) continue;
+    studentDirSet.add(candidate);
+  }
+  const rootCandidate = effectiveRoot || "";
+  if (
+    studentDirSet.size === 0 ||
+    (effectiveRoot && !studentDirSet.has(rootCandidate))
+  ) {
+    studentDirSet.add(rootCandidate);
+  }
+  const studentDirs = Array.from(studentDirSet);
+
   const totalTemplateNodes = templateNodeInfos.length || 1;
+
+  function matchDirectorySegments(
+    basePath: string,
+    matchers: RegExp[]
+  ): string[] {
+    let current = [basePath || ""];
+    for (const matcher of matchers) {
+      const next: string[] = [];
+      for (const prefix of current) {
+        const children = dirChildren[prefix] || new Set<string>();
+        for (const child of children) {
+          const leaf = child.split("/").pop() || "";
+          if (matcher.test(leaf)) next.push(child);
+        }
+      }
+      if (!next.length) return [];
+      current = next;
+    }
+    return current;
+  }
 
   function evaluateProjectCandidate(
     studentRoot: string,
     candidatePath: string
   ): StudentProject | null {
-    let matched = 0;
+    let cumulativeScore = 0;
     const matchResults: MatchResult[] = [];
-    for (const tni of templateNodeInfos) {
-      const relative = tni.pathSegments.join("/");
-      const expectedDir = relative ? candidatePath + "/" + relative : candidatePath;
+
+    for (const info of templateNodeInfos) {
       let status: MatchResult["status"] = "missing";
       let score = 0;
       let foundPath = "";
-      if (tni.type === "directory") {
-        const parentPath = expectedDir.includes("/")
-          ? expectedDir.slice(0, expectedDir.lastIndexOf("/"))
-          : "";
-        if (tni.nameRegex) {
-          const siblings = dirChildren[parentPath] || new Set();
-          for (const d of siblings) {
-            const leaf = d.split("/").pop() || "";
-            if (tni.nameRegex.test(leaf) && d === expectedDir) {
-              status = "found";
-              score = 100;
-              matched++;
-              foundPath = d;
-              break;
-            }
-          }
-        } else if (dirChildren[expectedDir]) {
+
+      if (info.type === "directory") {
+        const matches = matchDirectorySegments(
+          candidatePath,
+          info.segmentMatchers
+        );
+        if (matches.length) {
           status = "found";
           score = 100;
-          matched++;
-          foundPath = expectedDir;
+          foundPath = matches[0];
         }
       } else {
-        const expectedFile = expectedDir;
-        if (tni.nameRegex) {
-          const parentPath = expectedFile.includes("/")
-            ? expectedFile.slice(0, expectedFile.lastIndexOf("/"))
-            : "";
-          const parentPrefix = parentPath ? parentPath + "/" : "";
-          for (const file of fileSet) {
-            if (!file.startsWith(parentPrefix)) continue;
-            const leaf = file.split("/").pop() || "";
-            if (tni.nameRegex.test(leaf) && file === expectedFile) {
-              status = "found";
-              score = 100;
-              matched++;
-              foundPath = file;
-              break;
+        const segments = info.segmentMatchers;
+        if (segments.length) {
+          const dirMatchers = segments.slice(0, -1);
+          const fileMatcher = segments[segments.length - 1];
+          const parentCandidates = dirMatchers.length
+            ? matchDirectorySegments(candidatePath, dirMatchers)
+            : [candidatePath || ""];
+          for (const parentPath of parentCandidates) {
+            const files = filesByDir[parentPath] || new Set<string>();
+            for (const file of files) {
+              const leaf = file.split("/").pop() || "";
+              if (fileMatcher.test(leaf)) {
+                status = "found";
+                score = 100;
+                foundPath = file;
+                break;
+              }
+            }
+            if (status === "found") break;
+          }
+          if (status === "missing") {
+            const basePrefix = candidatePath
+              ? `${candidatePath.replace(/\/+/g, "/")}/`
+              : "";
+            if (basePrefix) {
+              for (const file of fileSet) {
+                if (!file.startsWith(basePrefix)) continue;
+                const relative = file.slice(basePrefix.length);
+                if (!relative) continue;
+                const segmentsBeforeFile = relative.split("/").length - 1;
+                if (segmentsBeforeFile < dirMatchers.length) continue;
+                const leaf = relative.split("/").pop() || "";
+                if (fileMatcher.test(leaf)) {
+                  status = "partial";
+                  score = 60;
+                  foundPath = file;
+                  break;
+                }
+              }
             }
           }
-        } else if (fileSet.has(expectedFile)) {
-          status = "found";
-          score = 100;
-          matched++;
-          foundPath = expectedFile;
         }
       }
-      matchResults.push({ templateNodeId: tni.id, foundPath, score, status });
+
+      cumulativeScore += score;
+
+      matchResults.push({
+        templateNodeId: info.id,
+        foundPath,
+        score,
+        status,
+      });
     }
-    const similarity = Math.round((matched / totalTemplateNodes) * 100);
-    if (similarity < similarityThreshold) return null;
-    const studentName = studentRoot
-      .slice(studentDirPrefix.length)
-      .split("/")[0];
-    const projectLeaf = candidatePath.split("/").slice(-1)[0];
+
+    const similarity = Math.round(cumulativeScore / totalTemplateNodes);
+    const isBelowThreshold = similarity < similarityThreshold;
+    if (isBelowThreshold) {
+      // Optionnel : garder trace de diagnostics en développement
+      // console.warn("candidate below threshold", { studentRoot, candidatePath, similarity, threshold: similarityThreshold, matchResults });
+    }
+
+    const studentName =
+      studentRoot.slice(studentDirPrefix.length).split("/")[0] ||
+      studentRoot ||
+      "root";
+    const projectLeaf = candidatePath.split("/").pop() || "project";
     const suggested = `${studentName}_${projectLeaf}`;
+
     return {
       projectRootPath: candidatePath,
       score: similarity,
-      matchedNodesCount: matched,
+      matchedNodesCount: matchResults.filter((m) => m.status === "found")
+        .length,
       totalTemplateNodes,
       templateMatches: matchResults,
       suggestedNewPath: suggested,
       newPath: suggested,
+      isBelowThreshold,
     };
   }
 
@@ -226,25 +333,47 @@ export async function analyzeZipWithReader(
         if (pj) candidateProjects.set(current, pj);
       }
     }
+    const rootCandidateProject = evaluateProjectCandidate(
+      studentDir,
+      studentDir
+    );
+    if (rootCandidateProject) {
+      candidateProjects.set(studentDir, rootCandidateProject);
+    }
     let picked = Array.from(candidateProjects.values()).sort(
       (a, b) => b.score - a.score
     );
     const filtered: StudentProject[] = [];
+    const fallback: StudentProject[] = [];
     const isAncestor = (a: string, b: string) => b.startsWith(a + "/");
+    const conflictsWith = (list: StudentProject[], pj: StudentProject) =>
+      list.some(
+        (kept) =>
+          isAncestor(kept.projectRootPath, pj.projectRootPath) ||
+          isAncestor(pj.projectRootPath, kept.projectRootPath)
+      );
+
     for (const pj of picked) {
-      if (
-        filtered.some(
-          (kept) =>
-            isAncestor(kept.projectRootPath, pj.projectRootPath) ||
-            isAncestor(pj.projectRootPath, kept.projectRootPath)
-        )
-      ) {
+      if (conflictsWith(filtered, pj) || conflictsWith(fallback, pj)) {
         continue;
       }
-      filtered.push(pj);
-      if (filtered.length >= projectsPerStudent) break;
+      if (!pj.isBelowThreshold && filtered.length < projectsPerStudent) {
+        filtered.push(pj);
+      } else if (fallback.length < projectsPerStudent) {
+        fallback.push(pj);
+      }
     }
-    picked = filtered;
+
+    if (filtered.length < projectsPerStudent && fallback.length) {
+      const remaining = projectsPerStudent - filtered.length;
+      filtered.push(...fallback.slice(0, remaining));
+    }
+
+    if (!filtered.length && fallback.length) {
+      filtered.push(fallback[0]);
+    }
+
+    picked = filtered.slice(0, projectsPerStudent);
     const overall = picked.length ? picked[0].score : 0;
     const legacyMatches = picked.length ? picked[0].templateMatches : [];
     results.push({
@@ -254,6 +383,18 @@ export async function analyzeZipWithReader(
       projects: picked,
       expectedProjects: projectsPerStudent,
     });
+  }
+
+  const hasOtherFolders = results.some((folder) => folder.name !== "");
+  if (hasOtherFolders) {
+    for (let i = results.length - 1; i >= 0; i--) {
+      const folder = results[i];
+      if (folder.name === "") {
+        const topProject = folder.projects[0];
+        if (topProject && topProject.score > 0) continue;
+        results.splice(i, 1);
+      }
+    }
   }
 
   function slugify(input: string): string {
@@ -436,22 +577,31 @@ export async function analyzeZipWithReader(
 export async function analyzeZipStructureMock(
   params: AnalysisParams
 ): Promise<StudentFolder[]> {
-  const { template, zipFile, studentRootPath, projectsPerStudent } = params;
+  return analyzeZipStructure({
+    template: params.template,
+    zipSource: { kind: "file", file: params.zipFile },
+    studentRootPath: params.studentRootPath,
+    projectsPerStudent: params.projectsPerStudent,
+    similarityThreshold: params.similarityThreshold,
+  });
+}
+
+export async function analyzeZipStructure(
+  params: ZipStructureAnalysisParams
+): Promise<StudentFolder[]> {
+  const { template, zipSource, studentRootPath, projectsPerStudent } = params;
+  if (zipSource.kind !== "file") {
+    throw new Error("Seuls les fichiers ZIP sont supportés");
+  }
   const reader: IZipReader = {
-    kind: 'jszip',
+    kind: "jszip",
     listEntries: async () => {
-      const data = await zipFile.arrayBuffer();
+      const JSZip = (await import("jszip")).default;
+      const data = await zipSource.file.arrayBuffer();
       const zip = await JSZip.loadAsync(data);
-      const out: { path: string; isDir: boolean }[] = [];
-      zip.forEach((relativePath, entry) => {
-        const clean = relativePath.replace(/\\/g, "/");
-        if (!clean) return;
-        const normalized = clean.endsWith("/") ? clean.slice(0, -1) : clean;
-        out.push({ path: normalized, isDir: entry.dir });
-      });
-      return out;
+      return collectEntriesFromJSZip(zip);
     },
-    capabilities: { expandNestedZipsClientSide: true }
+    capabilities: { expandNestedZipsClientSide: true },
   };
   return analyzeZipWithReader({
     template,

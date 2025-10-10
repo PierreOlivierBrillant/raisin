@@ -10,6 +10,8 @@ interface GenerateZipPanelProps {
   currentPath: string;
   onGenerate: () => Promise<void> | void;
   onCancel: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export const GenerateZipPanel: React.FC<GenerateZipPanelProps> = ({
@@ -18,6 +20,8 @@ export const GenerateZipPanel: React.FC<GenerateZipPanelProps> = ({
   currentPath,
   onGenerate,
   onCancel,
+  disabled,
+  disabledReason,
 }) => {
   return (
     <div style={resultsStyles.headerRow}>
@@ -26,7 +30,7 @@ export const GenerateZipPanel: React.FC<GenerateZipPanelProps> = ({
           onClick={onGenerate}
           className="btn btn-success"
           style={gzs.primaryButton}
-          disabled={isGenerating}
+          disabled={isGenerating || disabled}
         >
           {isGenerating ? (
             <>
@@ -48,6 +52,13 @@ export const GenerateZipPanel: React.FC<GenerateZipPanelProps> = ({
           >
             Annuler
           </button>
+        )}
+        {disabled && disabledReason && !isGenerating && (
+          <div
+            style={{ marginTop: ".5rem", fontSize: ".85rem", color: "#b45309" }}
+          >
+            {disabledReason}
+          </div>
         )}
         {isGenerating && (
           <div style={gzs.progressWrapper}>

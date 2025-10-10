@@ -8,6 +8,7 @@ import type { HierarchyTemplate, StudentFolder } from "../../types";
 import "../../styles/layout.css";
 import { useStepperState } from "../../hooks/useStepperState";
 import { raisinStyles } from "./Raisin.styles";
+import type { ZipSource } from "../../types/zip";
 
 interface RaisinProps {
   onBack?: () => void;
@@ -16,7 +17,7 @@ interface RaisinProps {
 export const Raisin: React.FC<RaisinProps> = ({ onBack }) => {
   const [currentTemplate, setCurrentTemplate] =
     useState<HierarchyTemplate | null>(null);
-  const [uploadedZip, setUploadedZip] = useState<File | null>(null);
+  const [uploadedZip, setUploadedZip] = useState<ZipSource | null>(null);
   const [analysisResults, setAnalysisResults] = useState<StudentFolder[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { current: currentStep, goTo: internalGoTo } = useStepperState<
@@ -138,11 +139,8 @@ export const Raisin: React.FC<RaisinProps> = ({ onBack }) => {
             <ZipUploadStep
               template={currentTemplate}
               onZipChosen={(file) => {
-                if (!file.name.toLowerCase().endsWith(".zip")) {
-                  alert("Fichier invalide : une archive .zip est requise");
-                  return;
-                }
                 setUploadedZip(file);
+                setAnalysisResults([]);
               }}
               onNext={() => goTo(2)}
             />
@@ -150,7 +148,7 @@ export const Raisin: React.FC<RaisinProps> = ({ onBack }) => {
           {currentStep === 2 && (
             <ParamsStep
               template={currentTemplate}
-              zipFile={uploadedZip}
+              zipSource={uploadedZip}
               onAnalysisComplete={setAnalysisResults}
               onNext={() => goTo(3)}
               setIsProcessing={setIsProcessing}
@@ -161,7 +159,7 @@ export const Raisin: React.FC<RaisinProps> = ({ onBack }) => {
             <ResultsStep
               template={currentTemplate}
               analysisResults={analysisResults}
-              zipFile={uploadedZip!}
+              zipSource={uploadedZip!}
               onResultsChange={(upd) => setAnalysisResults(upd)}
             />
           )}

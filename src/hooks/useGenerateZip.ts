@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { StudentFolder } from "../types";
 import { generateStandardizedZip } from "../services/generateStandardizedZip";
+import type { ZipSource } from "../types/zip";
 
 /** Options de génération du ZIP standardisé. */
 interface UseGenerateZipOptions {
@@ -20,7 +21,7 @@ interface ProgressInfo {
   cancel: () => void;
   /** Lance la génération avec suivi de progression. */
   generate: (
-    zipFile: File,
+    source: ZipSource,
     results: StudentFolder[],
     opts?: UseGenerateZipOptions
   ) => Promise<void>;
@@ -43,7 +44,7 @@ export function useGenerateZip(): ProgressInfo {
 
   const generate = useCallback(
     async (
-      zipFile: File,
+      source: ZipSource,
       results: StudentFolder[],
       opts?: UseGenerateZipOptions
     ) => {
@@ -52,7 +53,7 @@ export function useGenerateZip(): ProgressInfo {
         setProgress(0);
         cancelRef.current = false;
         await generateStandardizedZip(
-          zipFile,
+          source.file,
           results,
           { outputName: opts?.outputName || "standardized.zip" },
           (p, path) => {

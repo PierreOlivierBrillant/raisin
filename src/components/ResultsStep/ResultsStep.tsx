@@ -5,12 +5,13 @@ import { GenerateZipPanel } from "./GenerateZipPanel/GenerateZipPanel";
 import { ProjectDetailsModal } from "./ProjectDetailsModal/ProjectDetailsModal";
 import { StudentCard } from "./StudentCard/StudentCard";
 import { useGenerateZip } from "../../hooks/useGenerateZip";
+import type { ZipSource } from "../../types/zip";
 
 interface ResultsStepProps {
   template: HierarchyTemplate | null;
   analysisResults: StudentFolder[];
-  /** Archive ZIP analysée en entrée. */
-  zipFile: File;
+  /** Source analysée (fichier ZIP ou chemin local). */
+  zipSource: ZipSource;
   /** Callback lorsque l'utilisateur modifie un chemin projet. */
   onResultsChange?: (updated: StudentFolder[]) => void;
 }
@@ -19,7 +20,7 @@ interface ResultsStepProps {
 export const ResultsStep: React.FC<ResultsStepProps> = ({
   template,
   analysisResults,
-  zipFile,
+  zipSource,
   onResultsChange,
 }) => {
   const { progress, currentPath, isGenerating, generate, cancel } =
@@ -55,7 +56,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
         isGenerating={isGenerating}
         progress={progress}
         currentPath={currentPath}
-        onGenerate={() => generate(zipFile, analysisResults)}
+        onGenerate={() => generate(zipSource, analysisResults)}
         onCancel={cancel}
       />
       <div style={{ ...resultsStyles.studentList, gap: ".75rem" }}>
