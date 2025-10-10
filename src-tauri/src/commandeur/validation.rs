@@ -71,7 +71,7 @@ pub fn validate_operation(
                 );
             }
         }
-        OperationDetails::DeleteFile { target, .. } => {
+        OperationDetails::DeleteFile { target, required } => {
             let mut missing = Vec::new();
             for folder in &workspace.sub_folders {
                 let folder_path = workspace.folder_absolute_path(folder);
@@ -95,12 +95,36 @@ pub fn validate_operation(
                 }
             }
             if !missing.is_empty() {
+                let level = if *required {
+                    ValidationLevel::Error
+                } else {
+                    ValidationLevel::Warning
+                };
+                let details = if *required {
+                    format!(
+                        "L'opération \"{}\" (#{}) exige la présence du fichier \"{}\".",
+                        operation.label(),
+                        operation.id(),
+                        target
+                    )
+                } else {
+                    format!(
+                        "Opération \"{}\" (#{}) – fichier attendu : {}.",
+                        operation.label(),
+                        operation.id(),
+                        target
+                    )
+                };
                 push_validation(
                     messages,
                     operation,
-                    ValidationLevel::Warning,
-                    "Fichier introuvable dans certains sous-dossiers",
-                    Some("La suppression sera ignorée pour les dossiers manquants".into()),
+                    level,
+                    format!(
+                        "Fichier \"{}\" introuvable dans {} sous-dossier(s)",
+                        target,
+                        missing.len()
+                    ),
+                    Some(details),
                     Some(missing),
                 );
             }

@@ -1,22 +1,33 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { open } from "@tauri-apps/api/dialog";
+import { FolderOpen } from "lucide-react";
 import { commandeurStyles } from "./Commandeur.styles";
 import type { CommandeurWorkspaceSummary } from "../../types";
 import { prepareCommandeurWorkspace } from "../../services/commandeur/api";
+import Modal from "../Modal/Modal";
 
 interface WorkspaceStepProps {
   workspace: CommandeurWorkspaceSummary | null;
   onWorkspaceReady: (summary: CommandeurWorkspaceSummary) => void;
+  workspaceConfirmed: boolean;
+  onConfirm: () => void;
   onReset: () => void;
 }
 
 export const WorkspaceStep: React.FC<WorkspaceStepProps> = ({
   workspace,
   onWorkspaceReady,
+  workspaceConfirmed,
+  onConfirm,
   onReset,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSubfoldersDialog, setShowSubfoldersDialog] = useState(false);
+
+  useEffect(() => {
+    setShowSubfoldersDialog(false);
+  }, [workspace?.workspaceId]);
 
   const selectWorkspace = async () => {
     try {
@@ -57,50 +68,120 @@ export const WorkspaceStep: React.FC<WorkspaceStepProps> = ({
             Choisissez un dossier contenant les sous-dossiers étudiants.
           </p>
         </div>
-        {workspace && (
-          <div style={commandeurStyles.actionsRow}>
-            <button className="btn" onClick={onReset} disabled={isLoading}>
-              Réinitialiser
+      </div>
+
+      {!workspace && (
+        <div style={commandeurStyles.workspaceSelector.zone}>
+          <FolderOpen size={48} color="#9ca3af" />
+          <p style={commandeurStyles.workspaceSelector.hint}>
+            Sélectionnez le dossier racine qui contient les dossiers étudiants.
+          </p>
+          <div style={commandeurStyles.workspaceSelector.actions}>
+            <button
+              className="btn btn-primary"
+              onClick={() => selectWorkspace()}
+              disabled={isLoading}
+            >
+              {isLoading ? "Préparation..." : "Choisir un dossier"}
             </button>
           </div>
-        )}
-      </div>
-
-      <div
-        style={{ display: "flex", gap: ".75rem", flexWrap: "wrap" as const }}
-      >
-        <button
-          className="btn btn-primary"
-          onClick={() => selectWorkspace()}
-          disabled={isLoading}
-        >
-          Choisir un dossier…
-        </button>
-      </div>
-
-      {error && (
-        <div style={commandeurStyles.badge("error")}>Erreur : {error}</div>
+          {isLoading && (
+            <div style={commandeurStyles.workspaceSelector.status}>
+              Préparation du workspace...
+            </div>
+          )}
+          {error && (
+            <p style={commandeurStyles.workspaceSelector.error}>
+              Erreur : {error}
+            </p>
+          )}
+        </div>
       )}
 
-      {isLoading && (
-        <div style={commandeurStyles.badge("neutral")}>Chargement…</div>
-      )}
-
-      {workspace ? (
-        <section>
-          <div style={commandeurStyles.badgeRow}>
-            <span style={commandeurStyles.badge("success")}>
-              Mode : {workspace.mode === "zip" ? "Archive" : "Dossier"}
-            </span>
-            <span style={commandeurStyles.badge("neutral")}>
-              ID : {workspace.workspaceId}
-            </span>
-            <span style={commandeurStyles.badge("neutral")}>
-              Sous-dossiers : {workspace.subFolders.length}
-            </span>
+      {workspace && (
+        <section style={commandeurStyles.workspaceSummary.card}>
+          <div style={commandeurStyles.workspaceSummary.headerRow}>
+            <div style={commandeurStyles.workspaceSummary.controlGroup}>
+              <button
+                className="btn"
+                onClick={() => selectWorkspace()}
+                disabled={isLoading}
+              >
+                Changer de dossier
+              </button>
+              <button className="btn" onClick={onReset} disabled={isLoading}>
+                Réinitialiser
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setShowSubfoldersDialog(true)}
+                disabled={!workspace.subFolders.length}
+                title="Voir les sous-dossiers détectés"
+              >
+                Sous-dossiers ({workspace.subFolders.length})
+              </button>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={onConfirm}
+              disabled={workspaceConfirmed || isLoading}
+            >
+              {workspaceConfirmed ? "Workspace confirmé" : "Prochaine étape"}
+            </button>
           </div>
-          <div style={{ marginTop: ".85rem" }}>
-            <h4 style={{ margin: "0 0 .35rem" }}>Chemins</h4>
+          {workspace.extractedPath && (
+            <p style={commandeurStyles.workspaceSummary.extracted}>
+              Archive extraite : {workspace.extractedPath}
+            </p>
+          )}
+          {isLoading && (
+            <div style={commandeurStyles.workspaceSelector.status}>
+              Préparation du workspace...
+            </div>
+          )}
+          {error && (
+            <p style={commandeurStyles.workspaceSelector.error}>
+              Erreur : {error}
+            </p>
+          )}
+          {workspaceConfirmed && (
+            <div style={commandeurStyles.badgeRow}>
+              <span style={commandeurStyles.badge("success")}>
+                Workspace prêt pour l'étape suivante.
+              </span>
+            </div>
+          )}
+        </section>
+      )}
+
+      {showSubfoldersDialog && workspace && (
+        <Modal
+          onClose={() => setShowSubfoldersDialog(false)}
+          ariaLabel="Sous-dossiers détectés"
+          padding="1.5rem"
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem",
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0 }}>
+                Sous-dossiers détectés ({workspace.subFolders.length})
+              </h3>
+              <p
+                style={{
+                  margin: ".35rem 0 0",
+                  color: "#4b5563",
+                  fontSize: ".85rem",
+                }}
+              >
+                Aperçu du dossier sélectionné et de son contenu.
+              </p>
+            </div>
             <ul style={commandeurStyles.list}>
               <li style={commandeurStyles.listItem}>
                 <strong>Source :</strong> {workspace.sourcePath}
@@ -111,9 +192,6 @@ export const WorkspaceStep: React.FC<WorkspaceStepProps> = ({
                 </li>
               )}
             </ul>
-          </div>
-          <div style={{ marginTop: ".75rem" }}>
-            <h4 style={{ margin: "0 0 .35rem" }}>Sous-dossiers détectés</h4>
             {workspace.subFolders.length ? (
               <div style={commandeurStyles.summaryList}>
                 {workspace.subFolders.map((folderName) => (
@@ -130,12 +208,16 @@ export const WorkspaceStep: React.FC<WorkspaceStepProps> = ({
                 Aucun sous-dossier trouvé.
               </div>
             )}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowSubfoldersDialog(false)}
+              >
+                Fermer
+              </button>
+            </div>
           </div>
-        </section>
-      ) : (
-        <div style={commandeurStyles.emptyState}>
-          Aucun workspace chargé. Sélectionnez un dossier pour commencer.
-        </div>
+        </Modal>
       )}
     </div>
   );

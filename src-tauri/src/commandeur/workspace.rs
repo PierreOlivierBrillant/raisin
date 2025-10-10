@@ -15,6 +15,7 @@ use zip::CompressionMethod;
 
 use crate::commandeur::errors::CommandeurError;
 use crate::commandeur::models::{CommandeurExecutionLogEntry, CommandeurValidationMessage};
+use crate::commandeur::storage;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,9 +50,17 @@ impl WorkspaceHandle {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone)]
 pub struct AppState {
-    workspaces: Mutex<HashMap<String, Arc<Mutex<WorkspaceHandle>>>>,
+    workspaces: Arc<Mutex<HashMap<String, Arc<Mutex<WorkspaceHandle>>>>>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            workspaces: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
 }
 
 impl AppState {
@@ -211,13 +220,7 @@ pub fn write_execution_log(
     warnings: &[CommandeurValidationMessage],
     errors: &[CommandeurValidationMessage],
 ) -> Result<PathBuf> {
-    let base_dir = workspace
-        .source_path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-    let logs_dir = base_dir.join("commandeur-logs");
-    fs::create_dir_all(&logs_dir)?;
+    let logs_dir = storage::logs_dir()?;
     let filename = format!("commandeur-log-{}.txt", Utc::now().format("%Y%m%d-%H%M%S"));
     let file_path = logs_dir.join(filename);
     let mut file = fs::File::create(&file_path)?;

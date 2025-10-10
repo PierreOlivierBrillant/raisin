@@ -15,6 +15,9 @@ interface NodePanelProps {
   setChildType: (v: "file" | "directory") => void;
   addChildNode: () => void;
   deleteSelectedNode: () => void;
+  canDeleteRoot?: boolean;
+  deleteRoot?: () => void;
+  nameError?: string | null;
 }
 
 export const NodePanel: React.FC<NodePanelProps> = ({
@@ -31,8 +34,14 @@ export const NodePanel: React.FC<NodePanelProps> = ({
   setChildType,
   addChildNode,
   deleteSelectedNode,
+  canDeleteRoot,
+  deleteRoot,
+  nameError,
 }) => {
   const isRoot = selectedNode !== null && rootId === selectedNode;
+  const inputErrorStyle = nameError
+    ? { borderColor: "#dc2626", boxShadow: "0 0 0 1px rgba(220,38,38,0.2)" }
+    : undefined;
   return (
     <div className="card">
       <div className="v-stack md">
@@ -40,7 +49,7 @@ export const NodePanel: React.FC<NodePanelProps> = ({
           <h4 style={nodePanelStyles.sectionTitle}>
             {selectedNode
               ? isRoot
-                ? "Nœud racine (verrouillé)"
+                ? "Racine"
                 : "Modifier / Gérer le nœud"
               : "Sélectionnez un nœud"}
           </h4>
@@ -51,8 +60,20 @@ export const NodePanel: React.FC<NodePanelProps> = ({
               onChange={(e) => setNodeName(e.target.value)}
               className="input"
               placeholder={selectedNode ? "Nom du nœud" : "Nom"}
-              disabled={!selectedNode || isRoot}
+              disabled={!selectedNode}
+              aria-invalid={Boolean(nameError)}
+              style={inputErrorStyle}
             />
+            {isRoot && (
+              <p style={{ fontSize: 12, marginTop: 4, color: "#6b7280" }}>
+                Le nom de la racine doit être unique.
+              </p>
+            )}
+            {nameError && (
+              <p style={{ fontSize: 12, marginTop: 4, color: "#dc2626" }}>
+                {nameError}
+              </p>
+            )}
           </div>
           <div>
             <label className="form-label">Type</label>
@@ -120,6 +141,21 @@ export const NodePanel: React.FC<NodePanelProps> = ({
                 <button onClick={deleteSelectedNode} className="btn btn-danger">
                   Supprimer le nœud
                 </button>
+              </div>
+            )}
+            {isRoot && canDeleteRoot && (
+              <div className="v-stack sm">
+                <h4 style={nodePanelStyles.sectionTitle}>Danger</h4>
+                <button
+                  onClick={deleteRoot}
+                  className="btn btn-danger"
+                  disabled={!deleteRoot}
+                >
+                  Supprimer la racine
+                </button>
+                <p style={{ fontSize: 12, marginTop: 4, color: "#B45309" }}>
+                  Toute l'arborescence sous cette racine sera supprimée.
+                </p>
               </div>
             )}
           </>

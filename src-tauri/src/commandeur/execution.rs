@@ -4,6 +4,8 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{anyhow, Result};
+use serde::Serialize;
+use tauri::Window;
 
 use crate::commandeur::errors::CommandeurError;
 use crate::commandeur::models::{
@@ -21,8 +23,18 @@ use crate::commandeur::workspace::{
     WorkspaceHandle, WorkspaceMode,
 };
 
+const LOG_EVENT: &str = "commandeur://execution-log";
+const VALIDATION_EVENT: &str = "commandeur://execution-validation";
+
+fn emit_event<T: Serialize>(window: Option<&Window>, name: &str, payload: &T) {
+    if let Some(win) = window {
+        let _ = win.emit(name, payload);
+    }
+}
+
 pub fn execute_workflow(
     state: &AppState,
+    window: Option<&Window>,
     workspace_id: &str,
     workflow: &CommandeurWorkflow,
 ) -> Result<CommandeurExecutionResult> {
@@ -45,23 +57,28 @@ pub fn execute_workflow(
     } else {
         format!("Démarrage du workflow \"{}\"", workflow.name)
     };
-    push_workspace_log(&mut log_entries, ValidationLevel::Info, workflow_banner);
+    let start_entry =
+        push_workspace_log(&mut log_entries, ValidationLevel::Info, workflow_banner);
+    emit_event(window, LOG_EVENT, &start_entry);
 
     'folder_loop: for folder in &workspace.sub_folders {
         let base_path = workspace.folder_absolute_path(folder);
         if !base_path.exists() {
-            push_workspace_log(
+            let missing_entry = push_workspace_log(
                 &mut log_entries,
                 ValidationLevel::Error,
                 format!("Le dossier {folder} est introuvable"),
             );
-            errors.push(CommandeurValidationMessage {
+            emit_event(window, LOG_EVENT, &missing_entry);
+            let error_message = CommandeurValidationMessage {
                 operation_id: "__workspace__".into(),
                 level: ValidationLevel::Error,
                 message: format!("Le dossier {folder} est introuvable"),
                 details: None,
                 folders: Some(vec![folder.clone()]),
-            });
+            };
+            emit_event(window, VALIDATION_EVENT, &error_message);
+            errors.push(error_message);
             break 'folder_loop;
         }
 
@@ -75,6 +92,7 @@ pub fn execute_workflow(
                 operation,
                 folder,
                 &base_path,
+                window,
                 &mut env,
                 &mut log_entries,
                 &mut warnings,
@@ -90,30 +108,34 @@ pub fn execute_workflow(
                         source,
                     } => {
                         let detail = source.to_string();
-                        push_log_with_meta(
+                        let entry = push_log_with_meta(
                             &mut log_entries,
                             &operation_id,
                             &operation_label,
                             ValidationLevel::Error,
                             format!("[{folder}] Échec: {detail}"),
                         );
-                        errors.push(CommandeurValidationMessage {
+                        emit_event(window, LOG_EVENT, &entry);
+                        let error_message = CommandeurValidationMessage {
                             operation_id: operation_id.clone(),
                             level: ValidationLevel::Error,
                             message: format!("Erreur lors de l'opération pour {folder}"),
                             details: Some(detail.clone()),
                             folders: Some(vec![folder.clone()]),
-                        });
+                        };
+                        emit_event(window, VALIDATION_EVENT, &error_message);
+                        errors.push(error_message);
                         if !continue_on_error {
                             break 'folder_loop;
                         }
                     }
                     CommandeurError::WorkspaceNotFound => {
-                        push_workspace_log(
+                        let entry = push_workspace_log(
                             &mut log_entries,
                             ValidationLevel::Error,
                             "Workspace introuvable pendant l'exécution",
                         );
+                        emit_event(window, LOG_EVENT, &entry);
                         break 'folder_loop;
                     }
                 },
@@ -146,17 +168,19 @@ fn execute_operation_for_folder(
     operation: &CommandeurOperation,
     folder: &str,
     base_path: &Path,
+    window: Option<&Window>,
     env: &mut ExecutionEnv,
     log_entries: &mut Vec<CommandeurExecutionLogEntry>,
     warnings: &mut Vec<CommandeurValidationMessage>,
 ) -> Result<(), CommandeurError> {
     if let Some(comment) = operation.comment() {
-        push_log(
+        let entry = push_log(
             log_entries,
             operation,
             ValidationLevel::Info,
             format!("[{folder}] Note: {comment}"),
         );
+        emit_event(window, LOG_EVENT, &entry);
     }
 
     match &operation.details {
@@ -169,7 +193,7 @@ fn execute_operation_for_folder(
                 .map_err(|err| operation_failed(operation, err))?;
             ensure_parent_dir(&target_path).map_err(|err| operation_failed(operation, err))?;
             if target_path.exists() && !overwrite {
-                push_folder_validation(
+                let validation = push_folder_validation(
                     warnings,
                     operation,
                     folder,
@@ -177,20 +201,23 @@ fn execute_operation_for_folder(
                     format!("[{folder}] Le fichier existe déjà, création ignorée"),
                     Some(target_path.display().to_string()),
                 );
-                push_log(
+                emit_event(window, VALIDATION_EVENT, &validation);
+                let entry = push_log(
                     log_entries,
                     operation,
                     ValidationLevel::Info,
                     format!("[{folder}] Fichier existant conservé: {target}"),
                 );
+                emit_event(window, LOG_EVENT, &entry);
             } else {
                 fs::write(&target_path, content).map_err(|err| operation_failed(operation, err))?;
-                push_log(
+                let entry = push_log(
                     log_entries,
                     operation,
                     ValidationLevel::Info,
                     format!("[{folder}] Fichier créé: {target}"),
                 );
+                emit_event(window, LOG_EVENT, &entry);
             }
         }
         OperationDetails::DeleteFile { target, required } => {
@@ -199,7 +226,7 @@ fn execute_operation_for_folder(
             if !target_path.exists() {
                 let message = format!("[{folder}] Fichier à supprimer introuvable: {target}");
                 if *required {
-                    push_folder_validation(
+                    let validation = push_folder_validation(
                         warnings,
                         operation,
                         folder,
@@ -207,12 +234,13 @@ fn execute_operation_for_folder(
                         message.clone(),
                         None,
                     );
+                    emit_event(window, VALIDATION_EVENT, &validation);
                     return Err(operation_failed(
                         operation,
                         anyhow!("Suppression requise impossible: fichier introuvable"),
                     ));
                 } else {
-                    push_folder_validation(
+                    let validation = push_folder_validation(
                         warnings,
                         operation,
                         folder,
@@ -220,15 +248,17 @@ fn execute_operation_for_folder(
                         message,
                         None,
                     );
+                    emit_event(window, VALIDATION_EVENT, &validation);
                 }
             } else {
                 remove_path(&target_path).map_err(|err| operation_failed(operation, err))?;
-                push_log(
+                let entry = push_log(
                     log_entries,
                     operation,
                     ValidationLevel::Info,
                     format!("[{folder}] Fichier supprimé: {target}"),
                 );
+                emit_event(window, LOG_EVENT, &entry);
             }
         }
         OperationDetails::Copy {
@@ -264,7 +294,7 @@ fn execute_operation_for_folder(
                 }
             }
             fs::copy(&source_path, &dest_path).map_err(|err| operation_failed(operation, err))?;
-            push_log(
+            let entry = push_log(
                 log_entries,
                 operation,
                 ValidationLevel::Info,
@@ -273,6 +303,7 @@ fn execute_operation_for_folder(
                     source, destination
                 ),
             );
+            emit_event(window, LOG_EVENT, &entry);
         }
         OperationDetails::Exec {
             command,
@@ -309,12 +340,13 @@ fn execute_operation_for_folder(
                     ),
                 ));
             }
-            push_log(
+            let entry = push_log(
                 log_entries,
                 operation,
                 ValidationLevel::Info,
                 format!("[{folder}] Commande exécutée: {command}"),
             );
+            emit_event(window, LOG_EVENT, &entry);
         }
         OperationDetails::ReplaceInFile {
             target,
@@ -353,7 +385,7 @@ fn execute_operation_for_folder(
                 }
             };
             if count == 0 {
-                push_folder_validation(
+                let validation = push_folder_validation(
                     warnings,
                     operation,
                     folder,
@@ -361,9 +393,10 @@ fn execute_operation_for_folder(
                     format!("[{folder}] Aucun remplacement pour {target}"),
                     None,
                 );
+                emit_event(window, VALIDATION_EVENT, &validation);
             } else {
                 fs::write(&target_path, updated).map_err(|err| operation_failed(operation, err))?;
-                push_log(
+                let entry = push_log(
                     log_entries,
                     operation,
                     ValidationLevel::Info,
@@ -372,6 +405,7 @@ fn execute_operation_for_folder(
                         count
                     ),
                 );
+                emit_event(window, LOG_EVENT, &entry);
             }
         }
         OperationDetails::Rename {
@@ -409,12 +443,13 @@ fn execute_operation_for_folder(
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("?");
-            push_log(
+            let entry = push_log(
                 log_entries,
                 operation,
                 ValidationLevel::Info,
                 format!("[{folder}] Renommé {target} -> {dest_name}"),
             );
+            emit_event(window, LOG_EVENT, &entry);
         }
         OperationDetails::Move {
             source,
@@ -443,12 +478,13 @@ fn execute_operation_for_folder(
                 }
             }
             fs::rename(&source_path, &dest_path).map_err(|err| operation_failed(operation, err))?;
-            push_log(
+            let entry = push_log(
                 log_entries,
                 operation,
                 ValidationLevel::Info,
                 format!("[{folder}] Déplacement {source} -> {destination}"),
             );
+            emit_event(window, LOG_EVENT, &entry);
         }
         OperationDetails::Mkdir {
             target,
@@ -459,7 +495,7 @@ fn execute_operation_for_folder(
                 .map_err(|err| operation_failed(operation, err))?;
             if target_path.exists() {
                 if *skip_if_exists {
-                    push_folder_validation(
+                    let validation = push_folder_validation(
                         warnings,
                         operation,
                         folder,
@@ -467,6 +503,7 @@ fn execute_operation_for_folder(
                         format!("[{folder}] Dossier déjà présent: {target}"),
                         None,
                     );
+                    emit_event(window, VALIDATION_EVENT, &validation);
                     return Ok(());
                 }
             }
@@ -475,12 +512,13 @@ fn execute_operation_for_folder(
             } else {
                 fs::create_dir(&target_path).map_err(|err| operation_failed(operation, err))?;
             }
-            push_log(
+            let entry = push_log(
                 log_entries,
                 operation,
                 ValidationLevel::Info,
                 format!("[{folder}] Dossier créé: {target}"),
             );
+            emit_event(window, LOG_EVENT, &entry);
         }
         OperationDetails::Python {
             inline_script,
@@ -542,12 +580,13 @@ fn execute_operation_for_folder(
                     ),
                 ));
             }
-            push_log(
+            let entry = push_log(
                 log_entries,
                 operation,
                 ValidationLevel::Info,
                 format!("[{folder}] Script Python exécuté"),
             );
+            emit_event(window, LOG_EVENT, &entry);
         }
         OperationDetails::If {
             test,
@@ -572,6 +611,7 @@ fn execute_operation_for_folder(
                     child,
                     folder,
                     base_path,
+                    window,
                     env,
                     log_entries,
                     warnings,
@@ -579,7 +619,7 @@ fn execute_operation_for_folder(
                     return Err(err);
                 }
             }
-            push_log(
+            let entry = push_log(
                 log_entries,
                 operation,
                 ValidationLevel::Info,
@@ -589,6 +629,7 @@ fn execute_operation_for_folder(
                     if condition { "then" } else { "else" }
                 ),
             );
+            emit_event(window, LOG_EVENT, &entry);
         }
     }
     Ok(())

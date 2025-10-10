@@ -10,7 +10,7 @@ fn default_true() -> bool {
     true
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandeurWorkflow {
     pub name: String,
@@ -18,7 +18,7 @@ pub struct CommandeurWorkflow {
     pub operations: Vec<CommandeurOperation>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationMeta {
     pub id: String,
@@ -30,7 +30,7 @@ pub struct OperationMeta {
     pub continue_on_error: bool,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum OperationDetails {
     #[serde(rename_all = "camelCase")]
@@ -109,7 +109,7 @@ pub enum OperationDetails {
     },
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum ShellKind {
     Default,
@@ -118,14 +118,14 @@ pub enum ShellKind {
     Zsh,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum ReplaceMode {
     Plain,
     Regex,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum RenameMode {
     Suffix,
@@ -134,14 +134,14 @@ pub enum RenameMode {
     Replace,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum PythonEntry {
     Inline,
     File,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ConditionTest {
     pub exists: String,
@@ -149,7 +149,7 @@ pub struct ConditionTest {
     pub negate: bool,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandeurOperation {
     #[serde(flatten)]
@@ -180,7 +180,7 @@ impl CommandeurOperation {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandeurValidationMessage {
     pub operation_id: String,
@@ -198,7 +198,7 @@ pub enum ValidationLevel {
     Error,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandeurExecutionLogEntry {
     pub timestamp: String,
@@ -243,4 +243,12 @@ pub struct CommandeurExecutionResult {
     pub warnings: Vec<CommandeurValidationMessage>,
     pub errors: Vec<CommandeurValidationMessage>,
     pub output_archive_path: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedWorkflowSummary {
+    pub id: String,
+    pub name: String,
+    pub saved_at: String,
 }

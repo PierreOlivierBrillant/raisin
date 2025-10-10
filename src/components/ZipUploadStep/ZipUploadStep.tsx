@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import type { HierarchyTemplate } from "../../types";
 import { zipUploadStyles } from "./ZipUploadStep.styles";
 import { zipUploadExtraStyles } from "./ZipUploadStep.extra.styles";
@@ -33,7 +33,7 @@ export const ZipUploadStep: React.FC<ZipUploadStepProps> = ({
   return (
     <div className="card" style={zipUploadStyles.card as React.CSSProperties}>
       <div style={zipUploadStyles.uploadZone}>
-        <Upload size={48} color="#9ca3af" />
+        <FolderOpen size={48} color="#9ca3af" />
         <p style={zipUploadStyles.uploadHint}>
           Glissez-déposez votre fichier ZIP ici ou cliquez pour sélectionner
         </p>

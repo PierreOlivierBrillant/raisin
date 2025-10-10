@@ -18,7 +18,7 @@ export const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
   onClose,
 }) => {
   return (
-    <Modal onClose={onClose} ariaLabel="Détails du projet">
+    <Modal onClose={onClose} ariaLabel="Détails du projet" padding="0">
       <div style={pdms.header}>
         <div style={pdms.headerInfo}>
           <strong style={pdms.studentName}>{studentName} – Projet</strong>

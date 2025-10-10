@@ -11,14 +11,16 @@ pub fn push_validation(
     message: impl Into<String>,
     details: Option<String>,
     folders: Option<Vec<String>>,
-) {
-    messages.push(CommandeurValidationMessage {
+) -> CommandeurValidationMessage {
+    let entry = CommandeurValidationMessage {
         operation_id: operation.id().to_string(),
         level,
         message: message.into(),
         details,
         folders,
-    });
+    };
+    messages.push(entry.clone());
+    entry
 }
 
 pub fn push_folder_validation(
@@ -28,14 +30,16 @@ pub fn push_folder_validation(
     level: ValidationLevel,
     message: impl Into<String>,
     details: Option<String>,
-) {
-    messages.push(CommandeurValidationMessage {
+) -> CommandeurValidationMessage {
+    let entry = CommandeurValidationMessage {
         operation_id: operation.id().to_string(),
         level,
         message: message.into(),
         details,
         folders: Some(vec![folder.to_string()]),
-    });
+    };
+    messages.push(entry.clone());
+    entry
 }
 
 pub fn push_log(
@@ -43,13 +47,15 @@ pub fn push_log(
     operation: &CommandeurOperation,
     level: ValidationLevel,
     message: impl Into<String>,
-) {
-    entries.push(CommandeurExecutionLogEntry::new(
+) -> CommandeurExecutionLogEntry {
+    let entry = CommandeurExecutionLogEntry::new(
         operation.id(),
         operation.label(),
         level,
         message,
-    ));
+    );
+    entries.push(entry.clone());
+    entry
 }
 
 pub fn push_log_with_meta(
@@ -58,25 +64,29 @@ pub fn push_log_with_meta(
     operation_label: &str,
     level: ValidationLevel,
     message: impl Into<String>,
-) {
-    entries.push(CommandeurExecutionLogEntry::new(
+) -> CommandeurExecutionLogEntry {
+    let entry = CommandeurExecutionLogEntry::new(
         operation_id,
         operation_label,
         level,
         message,
-    ));
+    );
+    entries.push(entry.clone());
+    entry
 }
 
 pub fn push_workspace_log(
     entries: &mut Vec<CommandeurExecutionLogEntry>,
     level: ValidationLevel,
     message: impl Into<String>,
-) {
-    entries.push(CommandeurExecutionLogEntry {
+) -> CommandeurExecutionLogEntry {
+    let entry = CommandeurExecutionLogEntry {
         timestamp: Utc::now().to_rfc3339(),
         operation_id: "__workspace__".into(),
         operation_label: "Workspace".into(),
         message: message.into(),
         level,
-    });
+    };
+    entries.push(entry.clone());
+    entry
 }

@@ -884,6 +884,11 @@ fn main() {
             commandeur::commandeur_prepare_workspace,
             commandeur::commandeur_validate_workflow,
             commandeur::commandeur_execute_workflow,
+            commandeur::commandeur_list_saved_workflows,
+            commandeur::commandeur_save_workflow,
+            commandeur::commandeur_load_saved_workflow,
+            commandeur::commandeur_delete_saved_workflow,
+            commandeur::commandeur_duplicate_saved_workflow,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

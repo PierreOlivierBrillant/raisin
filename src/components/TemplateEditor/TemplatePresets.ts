@@ -1,7 +1,11 @@
 // Définitions de presets d'arborescences pour différents frameworks / stacks.
 // Chaque preset est une liste de chemins (relatifs à la racine) avec leur type.
 import type { HierarchyTemplate, FileNode } from "../../types";
-import { createNode, createDefaultTemplate } from "./TemplateEditor.logic";
+import {
+  createNode,
+  createDefaultTemplate,
+  ensureRootInvariant,
+} from "./TemplateEditor.logic";
 
 export type PresetKey =
   | "react"
@@ -147,6 +151,21 @@ const PRESETS: Record<PresetKey, PresetEntry[]> = {
   springboot: springbootPreset,
 };
 
+const PRESET_ROOT_LABELS: Record<PresetKey, string> = {
+  react: "React",
+  angular: "Angular",
+  vue: "Vue",
+  dotnet: ".NET",
+  maven: "Maven",
+  gradle: "Gradle",
+  flutter: "Flutter",
+  android: "Android",
+  laravel: "Laravel",
+  django: "Django",
+  rails: "Rails",
+  springboot: "Spring Boot",
+};
+
 /**
  * Construit un NOUVEAU template à partir d'un preset (remplacement total de l'arbre sauf racine).
  * Utile pour basculer rapidement entre frameworks (reset complet).
@@ -201,12 +220,26 @@ export function buildPresetTemplate(key: PresetKey): HierarchyTemplate {
     }
   }
   // Adapter nom / meta
-  return {
+  const displayName = PRESET_ROOT_LABELS[key] ?? `Preset ${key}`;
+  if (rootId && work.nodes[rootId]) {
+    work = {
+      ...work,
+      nodes: {
+        ...work.nodes,
+        [rootId]: {
+          ...work.nodes[rootId],
+          name: displayName,
+          path: displayName,
+        },
+      },
+    };
+  }
+  return ensureRootInvariant({
     ...work,
     id: `preset-${key}`,
     name: `Preset ${key}`,
     description: `Arborescence ${key}`,
-  };
+  });
 }
 
 /**

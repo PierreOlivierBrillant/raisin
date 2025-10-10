@@ -212,6 +212,12 @@ export interface CommandeurExecutionResult {
   outputArchivePath?: string;
 }
 
+export interface CommandeurSavedWorkflowSummary {
+  id: string;
+  name: string;
+  savedAt: string;
+}
+
 export interface CommandeurWorkspaceSummary {
   workspaceId: string;
   mode: "zip" | "directory";

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { zipFolderPickerStyles as s } from "./ZipFolderPicker.styles";
 import { zipFolderPickerExtraStyles as xs } from "./ZipFolderPicker.extra.styles";
 import { useZipTree } from "../../hooks/useZipTree";
@@ -15,6 +15,8 @@ interface ZipFolderPickerProps {
   inline?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
+  /** Chemin sélectionné à mettre en avant (optionnel). */
+  selectedPath?: string;
 }
 
 /** Sélecteur d'un dossier racine dans une archive ZIP analysée. */
@@ -25,6 +27,7 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
   inline = false,
   isOpen = true,
   onClose,
+  selectedPath,
 }) => {
   const { tree, status, error } = useZipTree(zipSource);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([""]));
@@ -63,6 +66,23 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
     walk(tree);
     return list;
   }, [tree, expanded]);
+
+  useEffect(() => {
+    if (selectedPath === undefined) return;
+    setActivePath(selectedPath);
+    if (!selectedPath) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.add("");
+      const segments = selectedPath.split("/").filter(Boolean);
+      let current = "";
+      for (const segment of segments) {
+        current = current ? `${current}/${segment}` : segment;
+        next.add(current);
+      }
+      return next;
+    });
+  }, [selectedPath]);
 
   if (!inline && !isOpen) return null;
 

@@ -51,6 +51,12 @@ export const teStyles = {
   toolbarWrapper: {
     marginBottom: "0.5rem",
   },
+  rootTabs: {
+    display: "flex",
+    gap: ".4rem",
+    flexWrap: "wrap" as const,
+    marginBottom: "0.75rem",
+  },
   mainRow: {
     display: "flex",
     flex: 1,
@@ -65,7 +71,9 @@ export const teStyles = {
     flex: 1,
     minWidth: 0,
     minHeight: 0,
-    height: graphHeight,
+    height: graphHeight ?? "100%",
+    maxHeight: "100%",
+    overflow: "hidden" as const,
     position: "relative" as const,
     display: "flex",
     flexDirection: "column" as const,
@@ -99,5 +107,6 @@ export const teStyles = {
     height: "100%",
     display: "flex",
     flexDirection: "column" as const,
+    overflowY: "auto" as const,
   }),
 } as const;

@@ -4,6 +4,7 @@ import type {
   CommandeurValidationMessage,
   CommandeurWorkflow,
   CommandeurWorkspaceSummary,
+  CommandeurSavedWorkflowSummary,
 } from "../../types";
 
 function ensureDesktop() {
@@ -41,4 +42,42 @@ export async function executeCommandeurWorkflow(
     workspaceId,
     workflow,
   });
+}
+
+export async function saveCommandeurWorkflow(
+  workflow: CommandeurWorkflow,
+  existingId?: string | null
+) {
+  ensureDesktop();
+  return invoke<CommandeurSavedWorkflowSummary>("commandeur_save_workflow", {
+    workflow,
+    existing_id: existingId ?? null,
+  });
+}
+
+export async function listSavedCommandeurWorkflows() {
+  ensureDesktop();
+  return invoke<CommandeurSavedWorkflowSummary[]>(
+    "commandeur_list_saved_workflows"
+  );
+}
+
+export async function loadSavedCommandeurWorkflow(id: string) {
+  ensureDesktop();
+  return invoke<CommandeurWorkflow>("commandeur_load_saved_workflow", {
+    id,
+  });
+}
+
+export async function deleteSavedCommandeurWorkflow(id: string) {
+  ensureDesktop();
+  return invoke<void>("commandeur_delete_saved_workflow", { id });
+}
+
+export async function duplicateSavedCommandeurWorkflow(id: string) {
+  ensureDesktop();
+  return invoke<CommandeurSavedWorkflowSummary>(
+    "commandeur_duplicate_saved_workflow",
+    { id }
+  );
 }
