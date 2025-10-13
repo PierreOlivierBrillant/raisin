@@ -254,6 +254,39 @@ body.no-scroll {
   transition: width 0.25s ease;
 }
 
+.workflow-checkbox {
+  appearance: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 0.3rem;
+  border: 2px solid #2563eb;
+  display: grid;
+  place-content: center;
+  background: #ffffff;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+.workflow-checkbox::after {
+  content: "";
+  width: 0.55rem;
+  height: 0.35rem;
+  border: 2px solid #ffffff;
+  border-top: 0;
+  border-right: 0;
+  transform: rotate(-45deg) scale(0);
+  transition: transform 0.15s ease;
+}
+.workflow-checkbox:checked {
+  background: #2563eb;
+}
+.workflow-checkbox:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+.workflow-checkbox:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
 /* Home Screen Tiles */
 .home-grid {
   display: grid;

@@ -8,6 +8,7 @@ use crate::commandeur::models::{
 };
 use crate::commandeur::python::detect_external_python_modules;
 use crate::commandeur::reporting::{push_folder_validation, push_validation};
+use crate::commandeur::conditions::evaluate_condition_for_folder;
 use crate::commandeur::utils::{build_regex, compute_rename_destination};
 use crate::commandeur::workspace::{resolve_in_folder, AppState, WorkspaceHandle};
 
@@ -561,14 +562,22 @@ pub fn validate_operation(
             then,
             else_branch,
         } => {
-            let mut missing = Vec::new();
+            let mut failing_folders = Vec::new();
+            let mut sample_summary: Option<String> = None;
+            let mut success_count = 0usize;
+            let total_folders = workspace.sub_folders.len();
             for folder in &workspace.sub_folders {
-                let folder_path = workspace.folder_absolute_path(folder);
-                match resolve_in_folder(&folder_path, &test.exists) {
-                    Ok(path) => {
-                        let exists = path.exists();
-                        if exists == test.negate {
-                            missing.push(folder.clone());
+                let base_path = workspace.folder_absolute_path(folder);
+                match evaluate_condition_for_folder(&base_path, folder, test) {
+                    Ok(evaluation) => {
+                        if evaluation.result {
+                            success_count += 1;
+                            if sample_summary.is_none() {
+                                sample_summary = Some(evaluation.summary.clone());
+                            }
+                        } else {
+                            failing_folders.push(folder.clone());
+                            sample_summary = Some(evaluation.summary.clone());
                         }
                     }
                     Err(err) => {
@@ -576,7 +585,7 @@ pub fn validate_operation(
                             messages,
                             operation,
                             ValidationLevel::Error,
-                            "Chemin de condition invalide",
+                            "Condition invalide",
                             Some(err.to_string()),
                             None,
                         );
@@ -584,21 +593,24 @@ pub fn validate_operation(
                     }
                 }
             }
-            if !missing.is_empty() {
-                let msg = if test.negate {
-                    "Le fichier existe alors qu'il ne devrait pas"
-                } else {
-                    "Le fichier de condition est absent"
-                };
-                push_validation(
-                    messages,
-                    operation,
-                    ValidationLevel::Info,
-                    msg,
-                    None,
-                    Some(missing),
-                );
-            }
+            let condition_message = format!(
+                "Condition vraie pour {}/{} fichiers",
+                success_count,
+                total_folders
+            );
+            let affected_folders = if failing_folders.is_empty() {
+                None
+            } else {
+                Some(failing_folders)
+            };
+            push_validation(
+                messages,
+                operation,
+                ValidationLevel::Info,
+                condition_message,
+                sample_summary,
+                affected_folders,
+            );
             for child in then {
                 validate_operation(workspace, child, messages)?;
             }

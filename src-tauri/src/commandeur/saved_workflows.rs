@@ -42,15 +42,13 @@ fn workflow_file_path(id: &str) -> Result<PathBuf> {
     Ok(dir.join(format!("{}.json", id)))
 }
 
-pub fn save_workflow(workflow: &CommandeurWorkflow, existing_id: Option<String>) -> Result<SavedWorkflowSummary> {
-    let id = if let Some(candidate) = existing_id {
-        if workflow_file_path(&candidate)?.exists() {
-            candidate
-        } else {
-            uuid::Uuid::new_v4().to_string()
-        }
-    } else {
-        uuid::Uuid::new_v4().to_string()
+pub fn save_workflow(
+    workflow: &CommandeurWorkflow,
+    existing_id: Option<String>,
+) -> Result<SavedWorkflowSummary> {
+    let id = match existing_id {
+        Some(candidate) => candidate,
+        None => uuid::Uuid::new_v4().to_string(),
     };
 
     let name = workflow.name.clone();

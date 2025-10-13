@@ -245,39 +245,48 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
                 style={commandeurStyles.logList}
                 data-user-scrolling={isUserScrolling ? "true" : "false"}
               >
-                {logEntries.map((entry) => (
-                  <div
-                    key={`${entry.timestamp}-${entry.operationId}-${entry.message}`}
-                    style={{
-                      ...commandeurStyles.logEntry,
-                      borderLeftColor:
-                        formatLevel(entry.level) === "warning"
-                          ? "#f59e0b"
-                          : formatLevel(entry.level) === "error"
-                          ? "#ef4444"
-                          : "#2563eb",
-                      background:
-                        formatLevel(entry.level) === "warning"
-                          ? "#fdf6d8"
-                          : formatLevel(entry.level) === "error"
-                          ? "#fce8e8"
-                          : "#f5f7fb",
-                    }}
-                  >
-                    <span style={commandeurStyles.logEntryTimestamp}>
-                      {new Date(entry.timestamp).toLocaleTimeString()}
-                    </span>
-                    <div style={commandeurStyles.logEntryBody}>
-                      <span>
-                        <strong>{entry.operationLabel}</strong>
-                        {entry.message ? ` · ${entry.message}` : ""}
+                {logEntries.map((entry) => {
+                  const tone = formatLevel(entry.level);
+                  const borderColor =
+                    tone === "warning"
+                      ? "#f59e0b"
+                      : tone === "error"
+                      ? "#ef4444"
+                      : "#2563eb";
+                  const backgroundColor =
+                    tone === "warning"
+                      ? "#fdf6d8"
+                      : tone === "error"
+                      ? "#fce8e8"
+                      : "#f5f7fb";
+                  return (
+                    <div
+                      key={`${entry.timestamp}-${entry.operationId}-${entry.message}`}
+                      style={{
+                        ...commandeurStyles.logEntry,
+                        borderLeftColor: borderColor,
+                        background: backgroundColor,
+                      }}
+                    >
+                      <span style={commandeurStyles.logEntryTimestamp}>
+                        {new Date(entry.timestamp).toLocaleTimeString()}
                       </span>
-                      <span style={{ fontSize: ".65rem", color: "#4b5563" }}>
-                        #{entry.operationId}
-                      </span>
+                      <div style={commandeurStyles.logEntryBody}>
+                        <span>
+                          <strong>{entry.operationLabel}</strong>
+                          {entry.message ? ` · ${entry.message}` : ""}
+                        </span>
+                        {tone !== "neutral" && (
+                          <span
+                            style={{ fontSize: ".65rem", color: "#4b5563" }}
+                          >
+                            #{entry.operationId}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div style={commandeurStyles.emptyState}>
@@ -292,38 +301,45 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
             <h4 style={{ margin: "0 0 .35rem" }}>Avertissements</h4>
             {hasWarnings ? (
               <div style={commandeurStyles.alertList}>
-                {warnings.map((warn) => (
-                  <div
-                    key={`${warn.operationId}-${warn.message}`}
-                    style={{
-                      ...commandeurStyles.logEntry,
-                      borderLeftColor: "#f59e0b",
-                      background: "#fdf6d8",
-                    }}
-                  >
-                    <span
+                {warnings.map((warn) => {
+                  const label = warn.operationLabel ?? "Opération";
+                  return (
+                    <div
+                      key={`${warn.operationId}-${warn.message}`}
                       style={{
-                        ...commandeurStyles.logEntryTimestamp,
-                        color: "#b45309",
+                        ...commandeurStyles.logEntry,
+                        borderLeftColor: "#f59e0b",
+                        background: "#fdf6d8",
                       }}
                     >
-                      {warn.operationId || "GLOBAL"}
-                    </span>
-                    <div style={commandeurStyles.logEntryBody}>
-                      <span>{warn.message}</span>
-                      {warn.details && (
-                        <span style={{ fontSize: ".68rem", color: "#92400e" }}>
-                          {warn.details}
-                        </span>
-                      )}
-                      {warn.folders && warn.folders.length > 0 && (
-                        <span style={{ fontSize: ".68rem", color: "#92400e" }}>
-                          Dossiers : {warn.folders.join(", ")}
-                        </span>
-                      )}
+                      <span
+                        style={{
+                          ...commandeurStyles.logEntryTimestamp,
+                          color: "#b45309",
+                        }}
+                      >
+                        {label}
+                      </span>
+                      <div style={commandeurStyles.logEntryBody}>
+                        <span>{warn.message}</span>
+                        {warn.details && (
+                          <span
+                            style={{ fontSize: ".68rem", color: "#92400e" }}
+                          >
+                            {warn.details}
+                          </span>
+                        )}
+                        {warn.folders && warn.folders.length > 0 && (
+                          <span
+                            style={{ fontSize: ".68rem", color: "#92400e" }}
+                          >
+                            Dossiers : {warn.folders.join(", ")}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div style={commandeurStyles.emptyState}>
@@ -344,12 +360,33 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
                     style={commandeurStyles.listItem}
                   >
                     <span style={commandeurStyles.badge("error")}>ERREUR</span>
-                    <div>{err.message}</div>
-                    {err.details && (
-                      <div style={{ fontSize: ".75rem", color: "#4b5563" }}>
-                        {err.details}
-                      </div>
-                    )}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: ".25rem",
+                      }}
+                    >
+                      <span>
+                        <strong>
+                          {err.operationLabel ??
+                            (err.operationId === "__workspace__"
+                              ? "Workspace"
+                              : "Opération")}
+                        </strong>
+                        {` · ${err.message}`}
+                      </span>
+                      {err.details && (
+                        <span style={{ fontSize: ".75rem", color: "#4b5563" }}>
+                          {err.details}
+                        </span>
+                      )}
+                      {err.folders && err.folders.length > 0 && (
+                        <span style={{ fontSize: ".75rem", color: "#4b5563" }}>
+                          Dossiers : {err.folders.join(", ")}
+                        </span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

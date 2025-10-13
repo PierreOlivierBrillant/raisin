@@ -19,6 +19,34 @@ export const CommandeurOperationKind = z.enum([
 
 export type CommandeurOperationKind = z.infer<typeof CommandeurOperationKind>;
 
+export const CommandeurConditionSelector = z.enum([
+  "current-folder-name",
+  "file-search",
+  "file-count",
+]);
+
+export type CommandeurConditionSelector = z.infer<
+  typeof CommandeurConditionSelector
+>;
+
+export const CommandeurConditionOperator = z.enum([
+  "equals",
+  "contains",
+  "regex",
+  "exists",
+  "not-exists",
+  "greater-than",
+  "less-than",
+]);
+
+export type CommandeurConditionOperator = z.infer<
+  typeof CommandeurConditionOperator
+>;
+
+export const CommandeurConditionScope = z.enum(["current-folder", "recursive"]);
+
+export type CommandeurConditionScope = z.infer<typeof CommandeurConditionScope>;
+
 export const PathFragmentSchema = z
   .string()
   .min(1, "Chemin requis")
@@ -110,13 +138,22 @@ const PythonSchema = BaseOperationSchema.extend({
 
 type CommandeurBaseOperation = z.infer<typeof BaseOperationSchema>;
 
+const ConditionTestSchema = z.object({
+  selector: CommandeurConditionSelector.optional(),
+  operator: CommandeurConditionOperator.optional(),
+  value: z.string().optional(),
+  pattern: z.string().optional(),
+  scope: CommandeurConditionScope.optional(),
+  exists: PathFragmentSchema.optional(),
+  negate: z.boolean().default(false),
+});
+
+export type CommandeurConditionTest = z.infer<typeof ConditionTestSchema>;
+
 export interface CommandeurConditionalOperation
   extends CommandeurBaseOperation {
   kind: "if";
-  test: {
-    exists: string;
-    negate?: boolean;
-  };
+  test: CommandeurConditionTest;
   then: CommandeurOperation[];
   else?: CommandeurOperation[];
 }
@@ -124,10 +161,7 @@ export interface CommandeurConditionalOperation
 const ConditionalSchema: z.ZodType<CommandeurConditionalOperation> =
   BaseOperationSchema.extend({
     kind: z.literal("if"),
-    test: z.object({
-      exists: PathFragmentSchema,
-      negate: z.boolean().default(false),
-    }),
+    test: ConditionTestSchema,
     then: z.lazy(() => CommandeurOperationSchema.array()),
     else: z.lazy(() => CommandeurOperationSchema.array()).optional(),
   });
@@ -188,6 +222,7 @@ export type CommandeurValidationLevel =
 
 export interface CommandeurValidationMessage {
   operationId: string;
+  operationLabel?: string;
   level: CommandeurValidationLevel;
   message: string;
   details?: string;

@@ -141,10 +141,45 @@ pub enum PythonEntry {
     File,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ConditionSelector {
+    CurrentFolderName,
+    FileSearch,
+    FileCount,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ConditionOperator {
+    Equals,
+    Contains,
+    Regex,
+    Exists,
+    #[serde(rename = "not-exists")]
+    NotExists,
+    #[serde(rename = "greater-than")]
+    GreaterThan,
+    #[serde(rename = "less-than")]
+    LessThan,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ConditionScope {
+    CurrentFolder,
+    Recursive,
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ConditionTest {
-    pub exists: String,
+    pub selector: Option<ConditionSelector>,
+    pub operator: Option<ConditionOperator>,
+    pub value: Option<String>,
+    pub pattern: Option<String>,
+    pub scope: Option<ConditionScope>,
+    pub exists: Option<String>,
     #[serde(default)]
     pub negate: bool,
 }
@@ -184,6 +219,8 @@ impl CommandeurOperation {
 #[serde(rename_all = "camelCase")]
 pub struct CommandeurValidationMessage {
     pub operation_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation_label: Option<String>,
     pub level: ValidationLevel,
     pub message: String,
     pub details: Option<String>,

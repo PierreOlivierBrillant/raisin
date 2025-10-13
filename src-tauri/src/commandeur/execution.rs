@@ -7,6 +7,7 @@ use anyhow::{anyhow, Result};
 use serde::Serialize;
 use tauri::Window;
 
+use crate::commandeur::conditions::evaluate_condition_for_folder;
 use crate::commandeur::errors::CommandeurError;
 use crate::commandeur::models::{
     CommandeurExecutionLogEntry, CommandeurExecutionResult, CommandeurOperation,
@@ -72,6 +73,7 @@ pub fn execute_workflow(
             emit_event(window, LOG_EVENT, &missing_entry);
             let error_message = CommandeurValidationMessage {
                 operation_id: "__workspace__".into(),
+                operation_label: Some("Workspace".into()),
                 level: ValidationLevel::Error,
                 message: format!("Le dossier {folder} est introuvable"),
                 details: None,
@@ -118,6 +120,7 @@ pub fn execute_workflow(
                         emit_event(window, LOG_EVENT, &entry);
                         let error_message = CommandeurValidationMessage {
                             operation_id: operation_id.clone(),
+                            operation_label: Some(operation_label.clone()),
                             level: ValidationLevel::Error,
                             message: format!("Erreur lors de l'opération pour {folder}"),
                             details: Some(detail.clone()),
@@ -593,10 +596,9 @@ fn execute_operation_for_folder(
             then,
             else_branch,
         } => {
-            let condition_path = resolve_in_folder(base_path, &test.exists)
+            let evaluation = evaluate_condition_for_folder(base_path, folder, test)
                 .map_err(|err| operation_failed(operation, err))?;
-            let exists = condition_path.exists();
-            let condition = if test.negate { !exists } else { exists };
+            let condition = evaluation.result;
             let iter: Box<dyn Iterator<Item = &CommandeurOperation>> = if condition {
                 Box::new(then.iter())
             } else {
@@ -624,8 +626,8 @@ fn execute_operation_for_folder(
                 operation,
                 ValidationLevel::Info,
                 format!(
-                    "[{folder}] Condition {} -> {}",
-                    test.exists,
+                    "[{folder}] Condition : {} -> {}",
+                    evaluation.summary,
                     if condition { "then" } else { "else" }
                 ),
             );

@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type {
+  CommandeurConditionOperator,
+  CommandeurConditionScope,
+  CommandeurConditionSelector,
+  CommandeurConditionTest,
   CommandeurOperation,
   CommandeurOperationKind,
   CommandeurWorkflow,
@@ -26,6 +30,119 @@ const operationKindLabels: Record<CommandeurOperationKind, string> = {
 const operationKindOptions = Object.entries(operationKindLabels).map(
   ([value, label]) => ({ value: value as CommandeurOperationKind, label })
 );
+
+type ConditionSelector = CommandeurConditionSelector;
+type ConditionOperator = CommandeurConditionOperator;
+type ConditionScope = CommandeurConditionScope;
+
+const defaultConditionSelector: ConditionSelector = "file-search";
+const defaultConditionScope: ConditionScope = "current-folder";
+
+const conditionSelectorOptions: ReadonlyArray<{
+  value: ConditionSelector;
+  label: string;
+}> = [
+  { value: "current-folder-name", label: "Nom du dossier courant" },
+  { value: "file-search", label: "Recherche de fichier" },
+  { value: "file-count", label: "Nombre de fichiers" },
+];
+
+const conditionOperatorOptions: Record<
+  ConditionSelector,
+  ReadonlyArray<{ value: ConditionOperator; label: string }>
+> = {
+  "current-folder-name": [
+    { value: "equals", label: "Égale" },
+    { value: "contains", label: "Contient" },
+    { value: "regex", label: "Correspond à la regex" },
+  ],
+  "file-search": [
+    { value: "exists", label: "Fichier correspondant présent" },
+    { value: "not-exists", label: "Aucun fichier correspondant" },
+  ],
+  "file-count": [
+    { value: "equals", label: "Égale à" },
+    { value: "greater-than", label: "Supérieure à" },
+    { value: "less-than", label: "Inférieure à" },
+  ],
+};
+
+const conditionScopeOptions: ReadonlyArray<{
+  value: ConditionScope;
+  label: string;
+}> = [
+  { value: "current-folder", label: "Dossier courant uniquement" },
+  { value: "recursive", label: "Inclure les sous-dossiers" },
+];
+
+function normalizeConditionTest(
+  test: CommandeurConditionTest
+): CommandeurConditionTest {
+  const selector: ConditionSelector = test.selector ?? defaultConditionSelector;
+  const operatorChoices = conditionOperatorOptions[selector];
+  const operatorValues = operatorChoices.map((option) => option.value);
+  const operator: ConditionOperator =
+    test.operator && operatorValues.includes(test.operator)
+      ? test.operator
+      : operatorChoices[0].value;
+
+  const negate = test.negate ?? false;
+
+  const normalized: CommandeurConditionTest = {
+    selector,
+    operator,
+    negate,
+  };
+
+  if (selector === "file-search" || selector === "file-count") {
+    const scope = test.scope ?? defaultConditionScope;
+    normalized.scope = scope;
+    const legacyExists = test.exists;
+    const patternSource = test.pattern ?? legacyExists ?? "";
+    const trimmedPattern = patternSource.trim();
+    if (trimmedPattern.length > 0) {
+      normalized.pattern = trimmedPattern;
+    }
+    if (legacyExists && legacyExists.trim().length > 0 && !test.pattern) {
+      normalized.exists = legacyExists.trim();
+    }
+  } else if (test.exists && test.exists.trim().length > 0) {
+    normalized.exists = test.exists;
+  }
+
+  if (selector === "current-folder-name") {
+    normalized.value = test.value ?? "";
+  } else if (selector === "file-count") {
+    normalized.value = test.value ?? "";
+  } else if (typeof test.value === "string" && test.value.trim().length > 0) {
+    normalized.value = test.value;
+  }
+
+  if (selector !== "file-search" && selector !== "file-count") {
+    delete normalized.scope;
+    delete normalized.pattern;
+    delete normalized.exists;
+  }
+
+  if (selector === "file-search" && normalized.pattern === undefined) {
+    normalized.pattern = "";
+  }
+
+  if (selector === "file-count" && normalized.pattern === undefined) {
+    normalized.pattern = "";
+  }
+
+  if (
+    selector !== "current-folder-name" &&
+    selector !== "file-count" &&
+    normalized.value !== undefined &&
+    normalized.value?.trim().length === 0
+  ) {
+    delete normalized.value;
+  }
+
+  return normalized;
+}
 
 function deepClone<T>(value: T): T {
   if (typeof structuredClone === "function") {
@@ -161,7 +278,10 @@ function createOperation(kind: CommandeurOperationKind): CommandeurOperation {
         ...base,
         kind,
         test: {
-          exists: "",
+          selector: defaultConditionSelector,
+          operator: "exists",
+          pattern: "",
+          scope: defaultConditionScope,
           negate: false,
         },
         then: [],
@@ -475,11 +595,15 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
             <div
               key={operation.id}
               style={workflowEditorStyles.listItem(!!active)}
-              onClick={() => setSelectedPath(path)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedPath(path);
+              }}
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
+                  event.stopPropagation();
                   setSelectedPath(path);
                 }
               }}
@@ -699,29 +823,11 @@ const OperationForm: React.FC<OperationFormProps> = ({
     <div style={workflowEditorStyles.formSection}>
       <div style={workflowEditorStyles.formGrid}>
         <div style={workflowEditorStyles.field}>
-          <label style={workflowEditorStyles.label}>Type</label>
-          <div style={workflowEditorStyles.readOnlyBadge}>
-            {operationKindLabels[operation.kind]}
-          </div>
-          <span style={workflowEditorStyles.helperText}>
-            Le type est défini lors de l'ajout d'une opération.
-          </span>
-        </div>
-        <div style={workflowEditorStyles.field}>
           <label style={workflowEditorStyles.label}>Libellé</label>
           <input
             style={workflowEditorStyles.input}
             value={operation.label}
             onChange={(event) => updateField("label", event.target.value)}
-          />
-        </div>
-        <div style={workflowEditorStyles.field}>
-          <label style={workflowEditorStyles.label}>Commentaire</label>
-          <textarea
-            style={workflowEditorStyles.textarea}
-            value={operation.comment ?? ""}
-            onChange={(event) => updateField("comment", event.target.value)}
-            placeholder="Note facultative pour contextualiser l'opération"
           />
         </div>
       </div>
@@ -732,7 +838,7 @@ const OperationForm: React.FC<OperationFormProps> = ({
             type="checkbox"
             checked={operation.enabled !== false}
             onChange={(event) => updateField("enabled", event.target.checked)}
-            style={workflowEditorStyles.checkboxInput}
+            className="workflow-checkbox"
           />
           Activée
         </label>
@@ -743,13 +849,23 @@ const OperationForm: React.FC<OperationFormProps> = ({
             onChange={(event) =>
               updateField("continueOnError", event.target.checked)
             }
-            style={workflowEditorStyles.checkboxInput}
+            className="workflow-checkbox"
           />
           Continuer en cas d'erreur
         </label>
       </div>
 
       <SpecificFields operation={operation} onUpdate={updateSpecific} />
+
+      <div style={workflowEditorStyles.field}>
+        <label style={workflowEditorStyles.label}>Commentaire</label>
+        <textarea
+          style={workflowEditorStyles.textarea}
+          value={operation.comment ?? ""}
+          onChange={(event) => updateField("comment", event.target.value)}
+          placeholder="Note facultative pour contextualiser l'opération"
+        />
+      </div>
     </div>
   );
 };
@@ -1253,39 +1369,251 @@ const SpecificFields: React.FC<SpecificFieldsProps> = ({
           />
         </div>
       );
-    case "if":
+    case "if": {
+      const normalizedTest = normalizeConditionTest(operation.test);
+      const selector = normalizedTest.selector ?? defaultConditionSelector;
+      const operatorChoices = conditionOperatorOptions[selector];
+      const operator =
+        normalizedTest.operator &&
+        operatorChoices.some(
+          (choice) => choice.value === normalizedTest.operator
+        )
+          ? normalizedTest.operator
+          : operatorChoices[0].value;
+      const scope = normalizedTest.scope ?? defaultConditionScope;
+      const pattern = normalizedTest.pattern ?? "";
+      const value = normalizedTest.value ?? "";
+
+      const handleSelectorChange = (nextSelector: ConditionSelector) => {
+        onUpdate((current) => {
+          if (current.kind !== "if") return current;
+          const normalized = normalizeConditionTest({
+            ...current.test,
+            selector: nextSelector,
+            operator: conditionOperatorOptions[nextSelector][0].value,
+            scope:
+              nextSelector === "file-search" || nextSelector === "file-count"
+                ? defaultConditionScope
+                : undefined,
+            pattern:
+              nextSelector === "file-search" || nextSelector === "file-count"
+                ? ""
+                : undefined,
+            value:
+              nextSelector === "file-count"
+                ? "1"
+                : nextSelector === "current-folder-name"
+                ? ""
+                : undefined,
+          });
+          return { ...current, test: normalized };
+        });
+      };
+
+      const handleOperatorChange = (nextOperator: ConditionOperator) => {
+        onUpdate((current) => {
+          if (current.kind !== "if") return current;
+          const normalized = normalizeConditionTest({
+            ...current.test,
+            operator: nextOperator,
+          });
+          return { ...current, test: normalized };
+        });
+      };
+
+      const handleScopeChange = (nextScope: ConditionScope) => {
+        onUpdate((current) => {
+          if (current.kind !== "if") return current;
+          const normalized = normalizeConditionTest({
+            ...current.test,
+            scope: nextScope,
+          });
+          return { ...current, test: normalized };
+        });
+      };
+
+      const handlePatternChange = (nextPattern: string) => {
+        onUpdate((current) => {
+          if (current.kind !== "if") return current;
+          const normalized = normalizeConditionTest({
+            ...current.test,
+            pattern: nextPattern,
+          });
+          return { ...current, test: normalized };
+        });
+      };
+
+      const handleValueChange = (nextValue: string) => {
+        onUpdate((current) => {
+          if (current.kind !== "if") return current;
+          const normalized = normalizeConditionTest({
+            ...current.test,
+            value: nextValue,
+          });
+          return { ...current, test: normalized };
+        });
+      };
+
+      const handleCountValueChange = (rawValue: string) => {
+        const sanitized = rawValue.replace(/[^0-9]/g, "");
+        handleValueChange(sanitized);
+      };
+
       return (
-        <div style={workflowEditorStyles.formGrid}>
-          <Field
-            label="Chemin à tester"
-            value={operation.test.exists}
-            onChange={(value) =>
-              onUpdate((current) =>
-                current.kind === "if"
-                  ? { ...current, test: { ...current.test, exists: value } }
-                  : current
-              )
-            }
-          />
-          <CheckboxField
-            label="Nier le résultat"
-            checked={operation.test.negate === true}
-            onChange={(checked) =>
-              onUpdate((current) =>
-                current.kind === "if"
-                  ? {
-                      ...current,
-                      test: { ...current.test, negate: checked },
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column" as const,
+            gap: ".75rem",
+          }}
+        >
+          <div style={workflowEditorStyles.formGrid}>
+            <div style={workflowEditorStyles.field}>
+              <label style={workflowEditorStyles.label}>Sélecteur</label>
+              <select
+                style={workflowEditorStyles.select}
+                value={selector}
+                onChange={(event) =>
+                  handleSelectorChange(event.target.value as ConditionSelector)
+                }
+              >
+                {conditionSelectorOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={workflowEditorStyles.field}>
+              <label style={workflowEditorStyles.label}>Opérateur</label>
+              <select
+                style={workflowEditorStyles.select}
+                value={operator}
+                onChange={(event) =>
+                  handleOperatorChange(event.target.value as ConditionOperator)
+                }
+              >
+                {operatorChoices.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {selector === "current-folder-name" && (
+            <div style={workflowEditorStyles.field}>
+              <label style={workflowEditorStyles.label}>Valeur attendue</label>
+              <input
+                style={workflowEditorStyles.input}
+                value={value}
+                onChange={(event) => handleValueChange(event.target.value)}
+                placeholder="Ex. projet-final"
+              />
+              <span style={workflowEditorStyles.helperText}>
+                Comparaison appliquée au nom du dossier étudiant courant.
+              </span>
+            </div>
+          )}
+
+          {selector === "file-search" && (
+            <div style={workflowEditorStyles.formGrid}>
+              <div style={workflowEditorStyles.field}>
+                <label style={workflowEditorStyles.label}>
+                  Motif de fichier
+                </label>
+                <input
+                  style={workflowEditorStyles.input}
+                  value={pattern}
+                  onChange={(event) => handlePatternChange(event.target.value)}
+                  placeholder="Ex. rapport.pdf ou *.yaml"
+                />
+                <span style={workflowEditorStyles.helperText}>
+                  Utilisez * comme caractère générique. Exemple : *.md.
+                </span>
+              </div>
+              <div style={workflowEditorStyles.field}>
+                <label style={workflowEditorStyles.label}>Portée</label>
+                <select
+                  style={workflowEditorStyles.select}
+                  value={scope}
+                  onChange={(event) =>
+                    handleScopeChange(event.target.value as ConditionScope)
+                  }
+                >
+                  {conditionScopeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {selector === "file-count" && (
+            <>
+              <div style={workflowEditorStyles.formGrid}>
+                <div style={workflowEditorStyles.field}>
+                  <label style={workflowEditorStyles.label}>
+                    Motif (optionnel)
+                  </label>
+                  <input
+                    style={workflowEditorStyles.input}
+                    value={pattern}
+                    onChange={(event) =>
+                      handlePatternChange(event.target.value)
                     }
-                  : current
-              )
-            }
-          />
+                    placeholder="Laissez vide pour compter tous les fichiers"
+                  />
+                  <span style={workflowEditorStyles.helperText}>
+                    Utilisez * comme caractère générique. Exemple : *.pdf.
+                  </span>
+                </div>
+                <div style={workflowEditorStyles.field}>
+                  <label style={workflowEditorStyles.label}>Portée</label>
+                  <select
+                    style={workflowEditorStyles.select}
+                    value={scope}
+                    onChange={(event) =>
+                      handleScopeChange(event.target.value as ConditionScope)
+                    }
+                  >
+                    {conditionScopeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={workflowEditorStyles.field}>
+                <label style={workflowEditorStyles.label}>
+                  Valeur de comparaison
+                </label>
+                <input
+                  style={workflowEditorStyles.input}
+                  type="number"
+                  min={0}
+                  value={value}
+                  onChange={(event) =>
+                    handleCountValueChange(event.target.value)
+                  }
+                />
+                <span style={workflowEditorStyles.helperText}>
+                  Nombre de fichiers correspondant au motif à comparer.
+                </span>
+              </div>
+            </>
+          )}
+
           <div style={workflowEditorStyles.helperText}>
             Les sous-opérations sont gérées dans le panneau de gauche.
           </div>
         </div>
       );
+    }
     default:
       return null;
   }
@@ -1333,7 +1661,7 @@ const CheckboxField: React.FC<CheckboxFieldProps> = ({
       type="checkbox"
       checked={checked}
       onChange={(event) => onChange(event.target.checked)}
-      style={workflowEditorStyles.checkboxInput}
+      className="workflow-checkbox"
     />
     {label}
   </label>

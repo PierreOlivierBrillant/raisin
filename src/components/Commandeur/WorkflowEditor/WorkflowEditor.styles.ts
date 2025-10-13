@@ -34,7 +34,7 @@ export const workflowEditorStyles = {
     display: "flex",
     flexDirection: "column" as const,
     gap: "1rem",
-    maxHeight: "520px",
+    height: "520px",
     overflow: "auto" as const,
   },
   listHeader: {
@@ -138,6 +138,8 @@ export const workflowEditorStyles = {
     display: "flex",
     flexDirection: "column" as const,
     gap: "1rem",
+    height: "520px",
+    overflow: "auto" as const,
   },
   formSection: {
     display: "flex",
@@ -178,27 +180,9 @@ export const workflowEditorStyles = {
     gap: ".45rem",
     alignItems: "center",
   },
-  checkboxInput: {
-    width: "1rem",
-    height: "1rem",
-    borderRadius: ".25rem",
-    border: "1px solid #9ca3af",
-    accentColor: "#2563eb",
-    background: "#fff",
-  },
   helperText: {
     fontSize: ".7rem",
     color: "#6b7280",
-  },
-  readOnlyBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    borderRadius: ".65rem",
-    background: "#f3f4f6",
-    color: "#1f2937",
-    fontWeight: 600,
-    fontSize: ".85rem",
-    padding: ".35rem .65rem",
   },
   placeholder: {
     color: "#6b7280",

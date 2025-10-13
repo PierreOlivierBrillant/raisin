@@ -14,6 +14,7 @@ pub fn push_validation(
 ) -> CommandeurValidationMessage {
     let entry = CommandeurValidationMessage {
         operation_id: operation.id().to_string(),
+        operation_label: Some(operation.label().to_string()),
         level,
         message: message.into(),
         details,
@@ -33,6 +34,7 @@ pub fn push_folder_validation(
 ) -> CommandeurValidationMessage {
     let entry = CommandeurValidationMessage {
         operation_id: operation.id().to_string(),
+        operation_label: Some(operation.label().to_string()),
         level,
         message: message.into(),
         details,

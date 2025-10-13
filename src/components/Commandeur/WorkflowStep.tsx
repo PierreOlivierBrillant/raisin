@@ -86,6 +86,21 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
   const [pendingSavedWorkflowId, setPendingSavedWorkflowId] = useState<
     string | null
   >(null);
+  const [activeSavedWorkflowId, setActiveSavedWorkflowId] = useState<
+    string | null
+  >(savedWorkflowId);
+
+  useEffect(() => {
+    if (savedWorkflowId) {
+      setActiveSavedWorkflowId(savedWorkflowId);
+    }
+  }, [savedWorkflowId]);
+
+  useEffect(() => {
+    if (savedWorkflowId === null && !workflow) {
+      setActiveSavedWorkflowId(null);
+    }
+  }, [savedWorkflowId, workflow]);
 
   const isDesktop = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -123,6 +138,7 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
       if (!selection || Array.isArray(selection)) return;
       const content = await readTextFile(selection);
       const parsed = parseWorkflowYaml(content);
+      setActiveSavedWorkflowId(null);
       onWorkflowLoaded({ workflow: parsed, path: selection, savedId: null });
       setSaveError(null);
     } catch (err) {
@@ -136,6 +152,7 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
       version: "1.0",
       operations: [],
     };
+    setActiveSavedWorkflowId(null);
     onWorkflowLoaded({ workflow: fresh, path: null, savedId: null });
     setImportError(null);
     setSaveError(null);
@@ -146,7 +163,22 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
     try {
       setIsSavingWorkflow(true);
       setSaveError(null);
-      const summary = await saveCommandeurWorkflow(workflow, savedWorkflowId);
+      const previousId = activeSavedWorkflowId;
+      const summary = await saveCommandeurWorkflow(
+        workflow,
+        activeSavedWorkflowId
+      );
+      if (previousId && summary.id !== previousId) {
+        try {
+          await deleteSavedCommandeurWorkflow(previousId);
+        } catch (cleanupError) {
+          console.warn(
+            "Impossible de supprimer l'ancien workflow sauvegardé",
+            cleanupError
+          );
+        }
+      }
+      setActiveSavedWorkflowId(summary.id);
       onWorkflowSaved(summary.id);
       await refreshSavedWorkflows();
       onNotify({
@@ -167,8 +199,8 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
     }
   }, [
     isDesktop,
+    activeSavedWorkflowId,
     refreshSavedWorkflows,
-    savedWorkflowId,
     workflow,
     onWorkflowSaved,
     onNotify,
@@ -179,6 +211,7 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
       if (!isDesktop) return;
       try {
         const loaded = await loadSavedCommandeurWorkflow(entry.id);
+        setActiveSavedWorkflowId(entry.id);
         onWorkflowLoaded({ workflow: loaded, path: null, savedId: entry.id });
         setImportError(null);
         setSaveError(null);
@@ -213,6 +246,9 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
         if (entry.id === savedWorkflowId) {
           onWorkflowSaved(null);
         }
+        if (entry.id === activeSavedWorkflowId) {
+          setActiveSavedWorkflowId(null);
+        }
         await refreshSavedWorkflows();
         onNotify({
           tone: "success",
@@ -231,6 +267,7 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
       }
     },
     [
+      activeSavedWorkflowId,
       isDesktop,
       onNotify,
       refreshSavedWorkflows,
@@ -251,6 +288,7 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
           message: `Workflow "${entry.name}" dupliqué`,
         });
         const duplicated = await loadSavedCommandeurWorkflow(summary.id);
+        setActiveSavedWorkflowId(summary.id);
         onWorkflowLoaded({
           workflow: duplicated,
           path: null,
@@ -463,22 +501,13 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
         <section
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
-          <div style={commandeurStyles.badgeRow}>
-            <span style={commandeurStyles.badge("neutral")}>
-              Nom : {workflow.name}
-            </span>
-            <span style={commandeurStyles.badge("neutral")}>
-              Version : {workflow.version ?? "1.0"}
-            </span>
-            <span style={commandeurStyles.badge("neutral")}>
-              Opérations : {workflow.operations.length}
-            </span>
-            {workflowPath && (
+          {workflowPath && (
+            <div style={commandeurStyles.badgeRow}>
               <span style={commandeurStyles.badge("neutral")}>
                 Fichier : {workflowPath}
               </span>
-            )}
-          </div>
+            </div>
+          )}
 
           <WorkflowEditor
             workflow={workflow}
@@ -510,38 +539,43 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
 
           {validationMessages.length > 0 && (
             <ul style={commandeurStyles.list}>
-              {validationMessages.map((msg) => (
-                <li
-                  key={msg.operationId + msg.message}
-                  style={commandeurStyles.listItem}
-                >
-                  <div style={commandeurStyles.badgeRow}>
-                    <span
-                      style={commandeurStyles.badge(
-                        msg.level === "error"
-                          ? "error"
-                          : msg.level === "warning"
-                          ? "warning"
-                          : "neutral"
-                      )}
-                    >
-                      {msg.level.toUpperCase()}
-                    </span>
-                    <strong>{msg.operationId}</strong>
-                  </div>
-                  <div>{msg.message}</div>
-                  {msg.details && (
-                    <div style={{ fontSize: ".75rem", color: "#4b5563" }}>
-                      {msg.details}
+              {validationMessages.map((msg) => {
+                const displayLabel =
+                  msg.operationLabel ??
+                  (msg.level !== "info" ? "Opération" : undefined);
+                return (
+                  <li
+                    key={msg.operationId + msg.message}
+                    style={commandeurStyles.listItem}
+                  >
+                    <div style={commandeurStyles.badgeRow}>
+                      <span
+                        style={commandeurStyles.badge(
+                          msg.level === "error"
+                            ? "error"
+                            : msg.level === "warning"
+                            ? "warning"
+                            : "neutral"
+                        )}
+                      >
+                        {msg.level.toUpperCase()}
+                      </span>
+                      {displayLabel && <strong>{displayLabel}</strong>}
                     </div>
-                  )}
-                  {msg.folders && msg.folders.length > 0 && (
-                    <div style={{ fontSize: ".75rem", color: "#4b5563" }}>
-                      Dossiers : {msg.folders.join(", ")}
-                    </div>
-                  )}
-                </li>
-              ))}
+                    <div>{msg.message}</div>
+                    {msg.details && (
+                      <div style={{ fontSize: ".75rem", color: "#4b5563" }}>
+                        {msg.details}
+                      </div>
+                    )}
+                    {msg.folders && msg.folders.length > 0 && (
+                      <div style={{ fontSize: ".75rem", color: "#4b5563" }}>
+                        Dossiers : {msg.folders.join(", ")}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
 

@@ -16,6 +16,10 @@ export type {
   CommandeurOperationKind,
   CommandeurWorkspaceSummary,
   CommandeurSavedWorkflowSummary,
+  CommandeurConditionSelector,
+  CommandeurConditionOperator,
+  CommandeurConditionScope,
+  CommandeurConditionTest,
 } from "./Commandeur";
 export {
   CommandeurOperationSchema,
