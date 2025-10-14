@@ -12,4 +12,6 @@ pub enum CommandeurError {
         #[source]
         source: anyhow::Error,
     },
+    #[error("Exécution interrompue: {reason}")]
+    ExecutionInterrupted { reason: String },
 }

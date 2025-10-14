@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/tauri";
 import type {
   CommandeurExecutionResult,
+  CommandeurExecutionStatus,
   CommandeurValidationMessage,
   CommandeurWorkflow,
   CommandeurWorkspaceSummary,
@@ -44,6 +45,21 @@ export async function executeCommandeurWorkflow(
   });
 }
 
+export async function pauseCommandeurExecution() {
+  ensureDesktop();
+  return invoke<CommandeurExecutionStatus>("commandeur_execution_pause");
+}
+
+export async function resumeCommandeurExecution() {
+  ensureDesktop();
+  return invoke<CommandeurExecutionStatus>("commandeur_execution_resume");
+}
+
+export async function stopCommandeurExecution() {
+  ensureDesktop();
+  return invoke<CommandeurExecutionStatus>("commandeur_execution_stop");
+}
+
 export async function saveCommandeurWorkflow(
   workflow: CommandeurWorkflow,
   existingId?: string | null
@@ -80,4 +96,9 @@ export async function duplicateSavedCommandeurWorkflow(id: string) {
     "commandeur_duplicate_saved_workflow",
     { id }
   );
+}
+
+export async function listAvailableShells() {
+  ensureDesktop();
+  return invoke<string[]>("list_available_shells");
 }

@@ -2,13 +2,13 @@ use std::fs;
 
 use anyhow::{anyhow, Result};
 
+use crate::commandeur::conditions::evaluate_condition_for_folder;
 use crate::commandeur::models::{
     CommandeurOperation, CommandeurValidationMessage, CommandeurWorkflow, OperationDetails,
     PythonEntry, ReplaceMode, ValidationLevel,
 };
 use crate::commandeur::python::detect_external_python_modules;
 use crate::commandeur::reporting::{push_folder_validation, push_validation};
-use crate::commandeur::conditions::evaluate_condition_for_folder;
 use crate::commandeur::utils::{build_regex, compute_rename_destination};
 use crate::commandeur::workspace::{resolve_in_folder, AppState, WorkspaceHandle};
 
@@ -22,8 +22,9 @@ pub fn validate_workflow(
         .lock()
         .map_err(|_| anyhow!("Accès concurrent au workspace"))?;
     let mut messages = Vec::new();
+    let active_folders = guard.sub_folders.clone();
     for operation in &workflow.operations {
-        validate_operation(&guard, operation, &mut messages)?;
+        validate_operation(&guard, operation, &active_folders, &mut messages)?;
     }
     Ok(messages)
 }
@@ -31,12 +32,16 @@ pub fn validate_workflow(
 pub fn validate_operation(
     workspace: &WorkspaceHandle,
     operation: &CommandeurOperation,
+    folders: &[String],
     messages: &mut Vec<CommandeurValidationMessage>,
 ) -> Result<()> {
+    if folders.is_empty() {
+        return Ok(());
+    }
     match &operation.details {
         OperationDetails::CreateFile { target, .. } => {
             let mut missing = Vec::new();
-            for folder in &workspace.sub_folders {
+            for folder in folders {
                 let folder_path = workspace.folder_absolute_path(folder);
                 match resolve_in_folder(&folder_path, target) {
                     Ok(target_path) => {
@@ -74,7 +79,7 @@ pub fn validate_operation(
         }
         OperationDetails::DeleteFile { target, required } => {
             let mut missing = Vec::new();
-            for folder in &workspace.sub_folders {
+            for folder in folders {
                 let folder_path = workspace.folder_absolute_path(folder);
                 match resolve_in_folder(&folder_path, target) {
                     Ok(target_path) => {
@@ -136,7 +141,7 @@ pub fn validate_operation(
             ..
         } => {
             let mut missing_source = Vec::new();
-            for folder in &workspace.sub_folders {
+            for folder in folders {
                 let folder_path = workspace.folder_absolute_path(folder);
                 match (
                     resolve_in_folder(&folder_path, source),
@@ -195,7 +200,7 @@ pub fn validate_operation(
             }
             if let Some(cwd_fragment) = cwd {
                 let mut missing = Vec::new();
-                for folder in &workspace.sub_folders {
+                for folder in folders {
                     let folder_path = workspace.folder_absolute_path(folder);
                     match resolve_in_folder(&folder_path, cwd_fragment) {
                         Ok(cwd_path) => {
@@ -258,7 +263,7 @@ pub fn validate_operation(
                 }
             }
             let mut missing = Vec::new();
-            for folder in &workspace.sub_folders {
+            for folder in folders {
                 let folder_path = workspace.folder_absolute_path(folder);
                 match resolve_in_folder(&folder_path, target) {
                     Ok(target_path) => {
@@ -299,7 +304,7 @@ pub fn validate_operation(
         } => {
             let mut missing = Vec::new();
             let mut conflicts = Vec::new();
-            for folder in &workspace.sub_folders {
+            for folder in folders {
                 let folder_path = workspace.folder_absolute_path(folder);
                 match resolve_in_folder(&folder_path, target) {
                     Ok(source_path) => {
@@ -373,7 +378,7 @@ pub fn validate_operation(
         } => {
             let mut missing = Vec::new();
             let mut conflicts = Vec::new();
-            for folder in &workspace.sub_folders {
+            for folder in folders {
                 let folder_path = workspace.folder_absolute_path(folder);
                 match (
                     resolve_in_folder(&folder_path, source),
@@ -426,7 +431,7 @@ pub fn validate_operation(
             ..
         } => {
             let mut exists = Vec::new();
-            for folder in &workspace.sub_folders {
+            for folder in folders {
                 let folder_path = workspace.folder_absolute_path(folder);
                 match resolve_in_folder(&folder_path, target) {
                     Ok(path) => {
@@ -508,7 +513,7 @@ pub fn validate_operation(
                     );
                 } else {
                     let mut missing = Vec::new();
-                    for folder in &workspace.sub_folders {
+                    for folder in folders {
                         let folder_path = workspace.folder_absolute_path(folder);
                         match resolve_in_folder(&folder_path, script_path.as_ref().unwrap()) {
                             Ok(path) => {
@@ -562,21 +567,23 @@ pub fn validate_operation(
             then,
             else_branch,
         } => {
-            let mut failing_folders = Vec::new();
+            let mut matching_folders = Vec::new();
+            let mut non_matching_folders = Vec::new();
             let mut sample_summary: Option<String> = None;
             let mut success_count = 0usize;
-            let total_folders = workspace.sub_folders.len();
-            for folder in &workspace.sub_folders {
+            let total_folders = folders.len();
+            for folder in folders {
                 let base_path = workspace.folder_absolute_path(folder);
                 match evaluate_condition_for_folder(&base_path, folder, test) {
                     Ok(evaluation) => {
                         if evaluation.result {
                             success_count += 1;
+                            matching_folders.push(folder.clone());
                             if sample_summary.is_none() {
                                 sample_summary = Some(evaluation.summary.clone());
                             }
                         } else {
-                            failing_folders.push(folder.clone());
+                            non_matching_folders.push(folder.clone());
                             sample_summary = Some(evaluation.summary.clone());
                         }
                     }
@@ -595,13 +602,12 @@ pub fn validate_operation(
             }
             let condition_message = format!(
                 "Condition vraie pour {}/{} fichiers",
-                success_count,
-                total_folders
+                success_count, total_folders
             );
-            let affected_folders = if failing_folders.is_empty() {
+            let affected_folders = if non_matching_folders.is_empty() {
                 None
             } else {
-                Some(failing_folders)
+                Some(non_matching_folders.clone())
             };
             push_validation(
                 messages,
@@ -612,11 +618,11 @@ pub fn validate_operation(
                 affected_folders,
             );
             for child in then {
-                validate_operation(workspace, child, messages)?;
+                validate_operation(workspace, child, &matching_folders, messages)?;
             }
             if let Some(else_branch) = else_branch {
                 for child in else_branch {
-                    validate_operation(workspace, child, messages)?;
+                    validate_operation(workspace, child, &non_matching_folders, messages)?;
                 }
             }
         }

@@ -11,6 +11,8 @@ export type {
   CommandeurWorkflow,
   CommandeurExecutionLogEntry,
   CommandeurExecutionResult,
+  CommandeurExecutionStatus,
+  CommandeurExecutionProgress,
   CommandeurValidationContext,
   CommandeurValidationMessage,
   CommandeurOperationKind,

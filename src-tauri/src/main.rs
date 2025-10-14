@@ -6,7 +6,7 @@ mod commandeur;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
-    fs,
+    env, fs,
     io::{Cursor, Read, Seek, Write},
     path::{Path, PathBuf},
 };
@@ -111,13 +111,11 @@ fn collect_zip_entries<R: Read + std::io::Seek>(
                     let nested_prefix = format!("{}/", full_path);
                     #[cfg(debug_assertions)]
                     {
-                        eprintln!(
-                            "[collect_zip_entries] expanding nested zip {:?}",
-                            full_path
-                        );
+                        eprintln!("[collect_zip_entries] expanding nested zip {:?}", full_path);
                     }
                     let before = entries.len();
-                    if let Err(err) = collect_zip_entries(&mut nested, &nested_prefix, entries, added)
+                    if let Err(err) =
+                        collect_zip_entries(&mut nested, &nested_prefix, entries, added)
                     {
                         eprintln!(
                             "[collect_zip_entries] unable to traverse nested zip {:?}: {}",
@@ -260,7 +258,10 @@ fn collect_virtual_files_from_zip<R: Read + Seek>(
         let mut data = Vec::new();
         file.read_to_end(&mut data).map_err(|e| e.to_string())?;
         let full_path = join_virtual_segments(prefix, &segments);
-        out.push(VirtualFile { path: full_path, data });
+        out.push(VirtualFile {
+            path: full_path,
+            data,
+        });
     }
     Ok(())
 }
@@ -278,10 +279,7 @@ fn collect_virtual_files_from_directory(
         for entry in entries {
             let entry = entry.map_err(|e| e.to_string())?;
             let entry_path = entry.path();
-            let file_name = entry
-                .file_name()
-                .to_string_lossy()
-                .replace('\\', "/");
+            let file_name = entry.file_name().to_string_lossy().replace('\\', "/");
             let next_prefix = if prefix.is_empty() {
                 file_name.clone()
             } else {
@@ -345,10 +343,7 @@ fn collect_virtual_files_from_source(path: &Path) -> Result<Vec<VirtualFile>, St
     let mut files = Vec::new();
     if path.is_file() {
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if !extension
-            .to_ascii_lowercase()
-            .starts_with("zip")
-        {
+        if !extension.to_ascii_lowercase().starts_with("zip") {
             return Err("Le fichier sélectionné n'est pas une archive ZIP".into());
         }
         let file = fs::File::open(path).map_err(|e| e.to_string())?;
@@ -670,9 +665,7 @@ fn generate_standardized_zip(
                 zip_writer
                     .start_file(dest_path.clone(), file_options.clone())
                     .map_err(|e| e.to_string())?;
-                zip_writer
-                    .write_all(&vf.data)
-                    .map_err(|e| e.to_string())?;
+                zip_writer.write_all(&vf.data).map_err(|e| e.to_string())?;
             }
         }
     }
@@ -682,6 +675,77 @@ fn generate_standardized_zip(
     Ok(GenerationResponsePayload {
         output_path: output_path.to_string_lossy().into_owned(),
     })
+}
+
+#[cfg(target_os = "windows")]
+fn collect_available_shells() -> Vec<String> {
+    use std::path::PathBuf;
+
+    let mut shells = Vec::new();
+    let mut seen = HashSet::new();
+
+    let mut push_unique = |value: String| {
+        if value.is_empty() {
+            return;
+        }
+        let key = value.to_ascii_lowercase();
+        if seen.insert(key) {
+            shells.push(value);
+        }
+    };
+
+    if let Ok(comspec) = env::var("ComSpec") {
+        push_unique(comspec);
+    } else {
+        push_unique(String::from(r"C:\Windows\System32\cmd.exe"));
+    }
+
+    if let Ok(system_root) = env::var("SystemRoot") {
+        let powershell_path = PathBuf::from(&system_root)
+            .join("System32")
+            .join("WindowsPowerShell")
+            .join("v1.0")
+            .join("powershell.exe");
+        push_unique(powershell_path.display().to_string());
+    } else {
+        push_unique(String::from("powershell.exe"));
+    }
+
+    push_unique(String::from("pwsh.exe"));
+
+    shells
+}
+
+#[cfg(not(target_os = "windows"))]
+fn collect_available_shells() -> Result<Vec<String>, String> {
+    let path = Path::new("/etc/shells");
+    let content = fs::read_to_string(path).unwrap_or_default();
+    let mut shells: Vec<String> = content
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| line.to_string())
+        .collect();
+
+    if shells.is_empty() {
+        shells.push(String::from("/bin/sh"));
+        shells.push(String::from("/bin/bash"));
+    }
+
+    Ok(shells)
+}
+
+#[tauri::command]
+fn list_available_shells() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        Ok(collect_available_shells())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        collect_available_shells()
+    }
 }
 
 #[cfg(test)]
@@ -721,8 +785,7 @@ mod tests {
         let mut archive = ZipArchive::new(cursor).expect("zip archive");
         let mut entries = Vec::new();
         let mut added = HashSet::new();
-        collect_zip_entries(&mut archive, "", &mut entries, &mut added)
-            .expect("collect entries");
+        collect_zip_entries(&mut archive, "", &mut entries, &mut added).expect("collect entries");
 
         let paths: HashSet<_> = entries.iter().map(|e| e.path.clone()).collect();
         assert!(paths.contains("settings.gradle"));
@@ -753,8 +816,7 @@ mod tests {
         let mut archive = ZipArchive::new(cursor).expect("outer zip");
         let mut entries = Vec::new();
         let mut added = HashSet::new();
-        collect_zip_entries(&mut archive, "", &mut entries, &mut added)
-            .expect("collect entries");
+        collect_zip_entries(&mut archive, "", &mut entries, &mut added).expect("collect entries");
 
         let paths: HashSet<_> = entries.iter().map(|e| e.path.clone()).collect();
         assert!(paths.contains("projects/nested.zip"));
@@ -791,19 +853,16 @@ mod tests {
         let mut archive = ZipArchive::new(cursor).expect("outermost zip");
         let mut entries = Vec::new();
         let mut added = HashSet::new();
-        collect_zip_entries(&mut archive, "", &mut entries, &mut added).expect("collect multi-level");
+        collect_zip_entries(&mut archive, "", &mut entries, &mut added)
+            .expect("collect multi-level");
 
         let paths: HashSet<_> = entries.iter().map(|e| e.path.clone()).collect();
         assert!(paths.contains("1030"));
         assert!(paths.contains("1030/StudentOne.zip"));
         assert!(paths.contains("1030/StudentOne.zip/nested"));
         assert!(paths.contains("1030/StudentOne.zip/nested/project.zip"));
-        assert!(paths.contains(
-            "1030/StudentOne.zip/nested/project.zip/Intra/build.gradle"
-        ));
-        assert!(paths.contains(
-            "1030/StudentOne.zip/nested/project.zip/Intra/settings.gradle"
-        ));
+        assert!(paths.contains("1030/StudentOne.zip/nested/project.zip/Intra/build.gradle"));
+        assert!(paths.contains("1030/StudentOne.zip/nested/project.zip/Intra/settings.gradle"));
     }
 
     #[test]
@@ -862,10 +921,8 @@ mod tests {
         fs::write(&student_zip_path, student_zip_data).expect("write student zip");
 
         let entries = list_entries(root_folder.to_string_lossy().into_owned()).expect("entries");
-        let paths: HashSet<(String, bool)> = entries
-            .iter()
-            .map(|e| (e.path.clone(), e.is_dir))
-            .collect();
+        let paths: HashSet<(String, bool)> =
+            entries.iter().map(|e| (e.path.clone(), e.is_dir)).collect();
 
         assert!(paths.contains(&("1030".to_string(), true)));
         assert!(paths.contains(&("1030/IntraAlexis.zip".to_string(), true)));
@@ -881,9 +938,13 @@ fn main() {
             ping,
             list_entries,
             generate_standardized_zip,
+            list_available_shells,
             commandeur::commandeur_prepare_workspace,
             commandeur::commandeur_validate_workflow,
             commandeur::commandeur_execute_workflow,
+            commandeur::commandeur_execution_pause,
+            commandeur::commandeur_execution_resume,
+            commandeur::commandeur_execution_stop,
             commandeur::commandeur_list_saved_workflows,
             commandeur::commandeur_save_workflow,
             commandeur::commandeur_load_saved_workflow,

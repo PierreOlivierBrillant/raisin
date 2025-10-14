@@ -14,6 +14,7 @@ use zip::write::FileOptions;
 use zip::CompressionMethod;
 
 use crate::commandeur::errors::CommandeurError;
+use crate::commandeur::execution_control::ExecutionControl;
 use crate::commandeur::models::{CommandeurExecutionLogEntry, CommandeurValidationMessage};
 use crate::commandeur::storage;
 
@@ -51,14 +52,21 @@ impl WorkspaceHandle {
 }
 
 #[derive(Clone)]
+pub struct ActiveExecution {
+    pub control: ExecutionControl,
+}
+
+#[derive(Clone)]
 pub struct AppState {
     workspaces: Arc<Mutex<HashMap<String, Arc<Mutex<WorkspaceHandle>>>>>,
+    execution: Arc<Mutex<Option<ActiveExecution>>>,
 }
 
 impl Default for AppState {
     fn default() -> Self {
         Self {
             workspaces: Arc::new(Mutex::new(HashMap::new())),
+            execution: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -70,6 +78,46 @@ impl AppState {
             .lock()
             .map_err(|_| anyhow!("Impossible d'obtenir le verrou du state"))?;
         guard.insert(handle.id.clone(), Arc::new(Mutex::new(handle)));
+        Ok(())
+    }
+
+    pub fn register_execution(&self) -> Result<ExecutionControl> {
+        let mut guard = self
+            .execution
+            .lock()
+            .map_err(|_| anyhow!("Impossible d'obtenir le verrou du state"))?;
+        if guard.is_some() {
+            return Err(anyhow!("Une exécution est déjà en cours"));
+        }
+        let control = ExecutionControl::new();
+        *guard = Some(ActiveExecution {
+            control: control.clone(),
+        });
+        Ok(control)
+    }
+
+    pub fn with_execution<F, T>(&self, f: F) -> Result<T>
+    where
+        F: FnOnce(&ActiveExecution) -> Result<T>,
+    {
+        let guard = self
+            .execution
+            .lock()
+            .map_err(|_| anyhow!("Impossible d'obtenir le verrou du state"))?;
+        let session = guard
+            .as_ref()
+            .ok_or_else(|| anyhow!("Aucune exécution en cours"))?;
+        f(session)
+    }
+
+    pub fn clear_execution(&self) -> Result<()> {
+        let mut guard = self
+            .execution
+            .lock()
+            .map_err(|_| anyhow!("Impossible d'obtenir le verrou du state"))?;
+        if let Some(active) = guard.take() {
+            active.control.mark_finished();
+        }
         Ok(())
     }
 
@@ -134,7 +182,7 @@ pub fn prepare_workspace(state: &AppState, path: &str) -> Result<CommandeurWorks
         id: workspace_id.clone(),
         mode,
         source_path,
-    root_path,
+        root_path,
         extracted,
         created_at: Utc::now(),
         sub_folders,

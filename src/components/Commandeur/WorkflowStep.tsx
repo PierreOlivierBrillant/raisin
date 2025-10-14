@@ -526,7 +526,7 @@ export const WorkflowStep: React.FC<WorkflowStepProps> = ({
               }}
               disabled={isValidating || !workspace}
             >
-              {isValidating ? "Validation en cours…" : "Relancer la validation"}
+              {isValidating ? "Validation en cours…" : "Valider et exécuter"}
             </button>
             <span style={commandeurStyles.badge(validationTone)}>
               {validationStatus === "running"

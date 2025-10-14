@@ -16,12 +16,17 @@ import Toast, { type ToastMessage, type ToastTone } from "../Toast/Toast";
 import type {
   CommandeurExecutionLogEntry,
   CommandeurExecutionResult,
+  CommandeurExecutionStatus,
+  CommandeurExecutionProgress,
   CommandeurValidationMessage,
   CommandeurWorkflow,
   CommandeurWorkspaceSummary,
 } from "../../types";
 import {
   executeCommandeurWorkflow,
+  pauseCommandeurExecution,
+  resumeCommandeurExecution,
+  stopCommandeurExecution,
   validateCommandeurWorkflow,
 } from "../../services/commandeur/api";
 
@@ -33,6 +38,7 @@ type StepId = 0 | 1 | 2;
 
 const LOG_EVENT = "commandeur://execution-log";
 const VALIDATION_EVENT = "commandeur://execution-validation";
+const PROGRESS_EVENT = "commandeur://execution-progress";
 
 export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
   const [currentStep, setCurrentStep] = useState<StepId>(0);
@@ -66,7 +72,13 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
   const [executionResult, setExecutionResult] =
     useState<CommandeurExecutionResult | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
-  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionStatus, setExecutionStatus] =
+    useState<CommandeurExecutionStatus>("idle");
+  const [executionProgress, setExecutionProgress] =
+    useState<CommandeurExecutionProgress>({
+      operationsProcessed: 0,
+      operationsTotal: 0,
+    });
   const [isDesktopRuntime, setIsDesktopRuntime] = useState(false);
   const lastValidationRef = useRef<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -86,6 +98,7 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
 
     let unlistenLog: UnlistenFn | null = null;
     let unlistenValidation: UnlistenFn | null = null;
+    let unlistenProgress: UnlistenFn | null = null;
     let active = true;
 
     (async () => {
@@ -108,6 +121,13 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
             }
           }
         );
+        unlistenProgress = await listen<CommandeurExecutionProgress>(
+          PROGRESS_EVENT,
+          (event) => {
+            if (!active) return;
+            setExecutionProgress(event.payload);
+          }
+        );
       } catch (err) {
         console.warn("Impossible d'écouter les événements Commandeur", err);
       }
@@ -117,6 +137,7 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
       active = false;
       if (unlistenLog) unlistenLog();
       if (unlistenValidation) unlistenValidation();
+      if (unlistenProgress) unlistenProgress();
     };
   }, []);
 
@@ -160,6 +181,8 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
     setLiveWarnings([]);
     setLiveErrors([]);
     setSavedWorkflowId(null);
+    setExecutionStatus("idle");
+    setExecutionProgress({ operationsProcessed: 0, operationsTotal: 0 });
     lastValidationRef.current = null;
   }, []);
 
@@ -248,6 +271,7 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
       setLiveLogEntries([]);
       setLiveWarnings([]);
       setLiveErrors([]);
+      setExecutionStatus("idle");
     },
     []
   );
@@ -263,6 +287,9 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
     setLiveLogEntries([]);
     setLiveWarnings([]);
     setLiveErrors([]);
+    setExecutionStatus("idle");
+    setExecutionProgress({ operationsProcessed: 0, operationsTotal: 0 });
+    setExecutionProgress({ operationsProcessed: 0, operationsTotal: 0 });
   }, []);
 
   const determineStatusFromMessages = useCallback(
@@ -319,13 +346,22 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
 
   const handleExecute = useCallback(async () => {
     if (!workspace || !workflow) return;
+    if (executionStatus !== "idle") return;
     try {
       setExecutionResult(null);
-      setIsExecuting(true);
+      setExecutionStatus("running");
       setExecutionError(null);
       setLiveLogEntries([]);
       setLiveWarnings([]);
       setLiveErrors([]);
+      const enabledOperations = workflow.operations.filter(
+        (op) => op.enabled
+      ).length;
+      const foldersCount = workspace.subFolders.length;
+      setExecutionProgress({
+        operationsProcessed: 0,
+        operationsTotal: enabledOperations * foldersCount,
+      });
       const result = await executeCommandeurWorkflow(
         workspace.workspaceId,
         workflow
@@ -336,10 +372,56 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
       setLiveErrors(result.errors);
     } catch (err) {
       setExecutionError(err instanceof Error ? err.message : String(err));
+      setExecutionProgress({ operationsProcessed: 0, operationsTotal: 0 });
     } finally {
-      setIsExecuting(false);
+      setExecutionStatus("idle");
     }
-  }, [workspace, workflow]);
+  }, [workspace, workflow, executionStatus]);
+
+  const handlePauseExecution = useCallback(async () => {
+    try {
+      const status = await pauseCommandeurExecution();
+      setExecutionStatus(status);
+    } catch (err) {
+      pushToast({
+        tone: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Impossible de mettre l'exécution en pause",
+      });
+    }
+  }, [pushToast]);
+
+  const handleResumeExecution = useCallback(async () => {
+    try {
+      const status = await resumeCommandeurExecution();
+      setExecutionStatus(status);
+    } catch (err) {
+      pushToast({
+        tone: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Impossible de reprendre l'exécution",
+      });
+    }
+  }, [pushToast]);
+
+  const handleStopExecution = useCallback(async () => {
+    try {
+      const status = await stopCommandeurExecution();
+      setExecutionStatus(status);
+    } catch (err) {
+      pushToast({
+        tone: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Impossible d'arrêter l'exécution",
+      });
+    }
+  }, [pushToast]);
 
   return (
     <div className="app-shell">
@@ -394,11 +476,16 @@ export const Commandeur: React.FC<CommandeurProps> = ({ onBack }) => {
             onExecute={handleExecute}
             executionResult={executionResult}
             executionError={executionError}
-            isExecuting={isExecuting}
+            isExecuting={executionStatus === "running"}
+            executionStatus={executionStatus}
             liveLogEntries={liveLogEntries}
             liveWarnings={liveWarnings}
             liveErrors={liveErrors}
+            executionProgress={executionProgress}
             isDesktopRuntime={isDesktopRuntime}
+            onPause={handlePauseExecution}
+            onResume={handleResumeExecution}
+            onStop={handleStopExecution}
           />
         )}
       </main>

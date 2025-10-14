@@ -3,6 +3,8 @@ import { commandeurStyles } from "./Commandeur.styles";
 import type {
   CommandeurExecutionLogEntry,
   CommandeurExecutionResult,
+  CommandeurExecutionStatus,
+  CommandeurExecutionProgress,
   CommandeurValidationMessage,
   CommandeurWorkflow,
   CommandeurWorkspaceSummary,
@@ -17,10 +19,15 @@ interface ExecutionStepProps {
   executionResult: CommandeurExecutionResult | null;
   executionError: string | null;
   isExecuting: boolean;
+  executionStatus: CommandeurExecutionStatus;
   liveLogEntries: CommandeurExecutionLogEntry[];
   liveWarnings: CommandeurValidationMessage[];
   liveErrors: CommandeurValidationMessage[];
   isDesktopRuntime: boolean;
+  executionProgress: CommandeurExecutionProgress;
+  onPause: () => Promise<void>;
+  onResume: () => Promise<void>;
+  onStop: () => Promise<void>;
 }
 
 function formatLevel(level: CommandeurExecutionLogEntry["level"]) {
@@ -44,10 +51,15 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
   executionResult,
   executionError,
   isExecuting,
+  executionStatus,
   liveLogEntries,
   liveWarnings,
   liveErrors,
+  executionProgress,
   isDesktopRuntime,
+  onPause,
+  onResume,
+  onStop,
 }) => {
   const hasBlockingErrors = validationMessages.some((m) => m.level === "error");
   const logEntries = executionResult
@@ -76,13 +88,32 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
   const prevScrollHeight = useRef(0);
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const { operationsProcessed, operationsTotal } = executionProgress;
   const progressValue = useMemo(() => {
+    if (operationsTotal > 0) {
+      return Math.min(1, operationsProcessed / operationsTotal);
+    }
     if (!workflow || workflow.operations.length === 0) return 0;
     const enabledOps = workflow.operations.filter((op) => op.enabled).length;
-    const foldersCount = workspace?.subFolders.length ?? 1;
-    const totalExpected = Math.max(1, enabledOps * foldersCount);
+    const foldersCount = workspace?.subFolders.length ?? 0;
+    const totalExpected = enabledOps * foldersCount;
+    if (totalExpected === 0) {
+      return 0;
+    }
     return Math.min(1, logEntries.length / totalExpected);
-  }, [workflow, logEntries.length, workspace?.subFolders.length]);
+  }, [
+    operationsProcessed,
+    operationsTotal,
+    workflow,
+    logEntries.length,
+    workspace?.subFolders.length,
+  ]);
+
+  const isExecutionActive =
+    executionStatus === "running" ||
+    executionStatus === "paused" ||
+    executionStatus === "stopping";
+  const isStopping = executionStatus === "stopping";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -121,14 +152,16 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
   }, [logEntries.length, warnings.length, errors.length, autoScrollEnabled]);
 
   const statusBadgeTone = useMemo(() => {
-    if (isExecuting) return "neutral" as const;
+    if (executionStatus === "stopping") return "warning" as const;
+    if (executionStatus === "paused") return "neutral" as const;
+    if (executionStatus === "running") return "neutral" as const;
     if (executionResult) {
       return executionResult.success
         ? ("success" as const)
         : ("error" as const);
     }
     return "neutral" as const;
-  }, [isExecuting, executionResult]);
+  }, [executionStatus, executionResult]);
 
   return (
     <div className="card" style={commandeurStyles.card}>
@@ -163,10 +196,43 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
         <button
           className="btn btn-primary"
           onClick={onExecute}
-          disabled={!workspace || !workflow || isExecuting || hasBlockingErrors}
+          disabled={
+            !workspace || !workflow || isExecutionActive || hasBlockingErrors
+          }
         >
-          {isExecuting ? "Exécution en cours…" : "Lancer l'exécution"}
+          {isExecutionActive ? "Exécution en cours…" : "Lancer l'exécution"}
         </button>
+        {executionStatus === "running" && (
+          <>
+            <button
+              className="btn"
+              onClick={() => void onPause()}
+              disabled={isStopping}
+            >
+              Mettre en pause
+            </button>
+            <button
+              className="btn"
+              onClick={() => void onStop()}
+              disabled={isStopping}
+            >
+              Arrêter
+            </button>
+          </>
+        )}
+        {executionStatus === "paused" && (
+          <>
+            <button className="btn btn-primary" onClick={() => void onResume()}>
+              Reprendre
+            </button>
+            <button className="btn" onClick={() => void onStop()}>
+              Arrêter
+            </button>
+          </>
+        )}
+        {executionStatus === "stopping" && (
+          <span style={commandeurStyles.badge("warning")}>Arrêt en cours…</span>
+        )}
         {hasBlockingErrors && (
           <span style={commandeurStyles.badge("error")}>
             Corrigez les erreurs de validation avant d'exécuter.
@@ -191,12 +257,16 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
         </div>
       )}
 
-      {isExecuting && <ProgressBar value={progressValue} height={8} />}
+      {isExecutionActive && <ProgressBar value={progressValue} height={8} />}
 
       <div style={commandeurStyles.statusRow}>
         <span style={commandeurStyles.badge(statusBadgeTone)}>
-          {isExecuting
+          {executionStatus === "running"
             ? `Exécution en cours (${eventsCountLabel})`
+            : executionStatus === "paused"
+            ? "Exécution en pause"
+            : executionStatus === "stopping"
+            ? "Arrêt de l'exécution"
             : executionResult
             ? executionResult.success
               ? "Exécution terminée"
@@ -290,7 +360,7 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
               </div>
             ) : (
               <div style={commandeurStyles.emptyState}>
-                {isExecuting
+                {executionStatus === "running"
                   ? "En attente des premiers journaux…"
                   : "Aucun journal disponible."}
               </div>
@@ -343,7 +413,7 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
               </div>
             ) : (
               <div style={commandeurStyles.emptyState}>
-                {isExecuting
+                {executionStatus === "running"
                   ? "Aucun avertissement pour l'instant."
                   : "Aucun avertissement."}
               </div>
@@ -353,46 +423,54 @@ export const ExecutionStep: React.FC<ExecutionStepProps> = ({
           <div>
             <h4 style={{ margin: "0 0 .35rem" }}>Erreurs</h4>
             {hasErrors ? (
-              <ul style={commandeurStyles.list}>
-                {errors.map((err) => (
-                  <li
-                    key={`${err.operationId}-${err.message}`}
-                    style={commandeurStyles.listItem}
-                  >
-                    <span style={commandeurStyles.badge("error")}>ERREUR</span>
+              <div style={commandeurStyles.alertList}>
+                {errors.map((err) => {
+                  const label =
+                    err.operationLabel ??
+                    (err.operationId === "__workspace__"
+                      ? "Workspace"
+                      : "Opération");
+                  return (
                     <div
+                      key={`${err.operationId}-${err.message}`}
                       style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: ".25rem",
+                        ...commandeurStyles.logEntry,
+                        borderLeftColor: "#ef4444",
+                        background: "#fce8e8",
                       }}
                     >
-                      <span>
-                        <strong>
-                          {err.operationLabel ??
-                            (err.operationId === "__workspace__"
-                              ? "Workspace"
-                              : "Opération")}
-                        </strong>
-                        {` · ${err.message}`}
+                      <span
+                        style={{
+                          ...commandeurStyles.logEntryTimestamp,
+                          color: "#b91c1c",
+                        }}
+                      >
+                        {label}
                       </span>
-                      {err.details && (
-                        <span style={{ fontSize: ".75rem", color: "#4b5563" }}>
-                          {err.details}
-                        </span>
-                      )}
-                      {err.folders && err.folders.length > 0 && (
-                        <span style={{ fontSize: ".75rem", color: "#4b5563" }}>
-                          Dossiers : {err.folders.join(", ")}
-                        </span>
-                      )}
+                      <div style={commandeurStyles.logEntryBody}>
+                        <span>{err.message}</span>
+                        {err.details && (
+                          <span
+                            style={{ fontSize: ".68rem", color: "#7f1d1d" }}
+                          >
+                            {err.details}
+                          </span>
+                        )}
+                        {err.folders && err.folders.length > 0 && (
+                          <span
+                            style={{ fontSize: ".68rem", color: "#7f1d1d" }}
+                          >
+                            Dossiers : {err.folders.join(", ")}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </li>
-                ))}
-              </ul>
+                  );
+                })}
+              </div>
             ) : (
               <div style={commandeurStyles.emptyState}>
-                {isExecuting
+                {executionStatus === "running"
                   ? "Aucune erreur pour l'instant."
                   : "Aucune erreur."}
               </div>

@@ -10,6 +10,7 @@ import type {
 } from "../../../types";
 import type { CommandeurConditionalOperation } from "../../../types/Commandeur";
 import { workflowEditorStyles } from "./WorkflowEditor.styles";
+import { listAvailableShells } from "../../../services/commandeur/api";
 
 type OperationBranchKey = "then" | "else";
 type OperationPath = Array<number | OperationBranchKey>;
@@ -468,6 +469,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   const [selectedPath, setSelectedPath] = useState<OperationPath | null>(
     workflow.operations.length ? [0] : null
   );
+  const [availableShells, setAvailableShells] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (!selectedPath) {
@@ -485,6 +487,31 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
       }
     }
   }, [workflow.operations, selectedPath]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("__TAURI__" in window)) {
+      setAvailableShells([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    listAvailableShells()
+      .then((shells) => {
+        if (!cancelled) {
+          setAvailableShells(shells);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAvailableShells([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const selectedOperation = useMemo(
     () => getOperationAtPath(workflow.operations, selectedPath),
@@ -745,6 +772,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
             <OperationForm
               operation={selectedOperation}
               onUpdate={updateSelectedOperation}
+              availableShells={availableShells}
             />
           ) : (
             <div style={workflowEditorStyles.placeholder}>
@@ -799,11 +827,13 @@ interface OperationFormProps {
   onUpdate: (
     updater: (operation: CommandeurOperation) => CommandeurOperation
   ) => void;
+  availableShells: string[] | null;
 }
 
 const OperationForm: React.FC<OperationFormProps> = ({
   operation,
   onUpdate,
+  availableShells,
 }) => {
   const updateField = <K extends keyof CommandeurOperation>(
     key: K,
@@ -855,7 +885,11 @@ const OperationForm: React.FC<OperationFormProps> = ({
         </label>
       </div>
 
-      <SpecificFields operation={operation} onUpdate={updateSpecific} />
+      <SpecificFields
+        operation={operation}
+        onUpdate={updateSpecific}
+        availableShells={availableShells}
+      />
 
       <div style={workflowEditorStyles.field}>
         <label style={workflowEditorStyles.label}>Commentaire</label>
@@ -875,11 +909,13 @@ interface SpecificFieldsProps {
   onUpdate: (
     mutator: (operation: CommandeurOperation) => CommandeurOperation
   ) => void;
+  availableShells: string[] | null;
 }
 
 const SpecificFields: React.FC<SpecificFieldsProps> = ({
   operation,
   onUpdate,
+  availableShells,
 }) => {
   switch (operation.kind) {
     case "create-file":
@@ -1043,7 +1079,17 @@ const SpecificFields: React.FC<SpecificFieldsProps> = ({
               <option value="bash">Bash</option>
               <option value="zsh">Zsh</option>
               <option value="powershell">PowerShell</option>
+              <option value="fish">Fish</option>
             </select>
+            {availableShells !== null && (
+              <div style={workflowEditorStyles.helperText}>
+                {availableShells.length > 0
+                  ? `Shells disponibles sur ce système : ${availableShells.join(
+                      ", "
+                    )}`
+                  : "Shells disponibles : information indisponible sur ce système."}
+              </div>
+            )}
           </div>
           <Field
             label="Variables d'environnement (clé=valeur, une par ligne)"

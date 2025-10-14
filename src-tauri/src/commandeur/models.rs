@@ -116,6 +116,7 @@ pub enum ShellKind {
     Powershell,
     Bash,
     Zsh,
+    Fish,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

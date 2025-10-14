@@ -27,9 +27,7 @@ pub struct ConditionEvaluation {
 }
 
 pub fn normalize_condition(test: &ConditionTest) -> NormalizedConditionTest {
-    let selector = test
-        .selector
-        .unwrap_or(ConditionSelector::FileSearch);
+    let selector = test.selector.unwrap_or(ConditionSelector::FileSearch);
 
     let default_operator = default_operator_for_selector(selector);
     let operator = test
@@ -70,10 +68,9 @@ pub fn normalize_condition(test: &ConditionTest) -> NormalizedConditionTest {
     };
 
     let scope = match selector {
-        ConditionSelector::FileSearch | ConditionSelector::FileCount => Some(
-            test.scope
-                .unwrap_or(ConditionScope::CurrentFolder),
-        ),
+        ConditionSelector::FileSearch | ConditionSelector::FileCount => {
+            Some(test.scope.unwrap_or(ConditionScope::CurrentFolder))
+        }
         _ => None,
     };
 
@@ -94,9 +91,7 @@ pub fn evaluate_condition_for_folder(
 ) -> Result<ConditionEvaluation> {
     let normalized = normalize_condition(test);
     match normalized.selector {
-        ConditionSelector::CurrentFolderName => {
-            evaluate_current_folder(folder, &normalized)
-        }
+        ConditionSelector::CurrentFolderName => evaluate_current_folder(folder, &normalized),
         ConditionSelector::FileSearch => evaluate_file_search(base_path, &normalized),
         ConditionSelector::FileCount => evaluate_file_count(base_path, &normalized),
     }
@@ -106,10 +101,7 @@ fn evaluate_current_folder(
     folder: &str,
     normalized: &NormalizedConditionTest,
 ) -> Result<ConditionEvaluation> {
-    let value = normalized
-        .value
-        .clone()
-        .unwrap_or_else(String::new);
+    let value = normalized.value.clone().unwrap_or_else(String::new);
 
     let raw_result = match normalized.operator {
         ConditionOperator::Equals => folder == value,
@@ -150,9 +142,7 @@ fn evaluate_file_search(
         .pattern
         .clone()
         .ok_or_else(|| anyhow!("Motif de recherche manquant"))?;
-    let scope = normalized
-        .scope
-        .unwrap_or(ConditionScope::CurrentFolder);
+    let scope = normalized.scope.unwrap_or(ConditionScope::CurrentFolder);
     let matches = collect_matches(base_path, &pattern, scope)?;
     let raw_result = match normalized.operator {
         ConditionOperator::Exists => !matches.is_empty(),
@@ -185,19 +175,14 @@ fn evaluate_file_count(
         .pattern
         .clone()
         .unwrap_or_else(|| "*".to_string());
-    let scope = normalized
-        .scope
-        .unwrap_or(ConditionScope::CurrentFolder);
+    let scope = normalized.scope.unwrap_or(ConditionScope::CurrentFolder);
     let matches = collect_matches(base_path, &pattern, scope)?;
     let file_count = matches.iter().filter(|path| path.is_file()).count() as i64;
 
-    let threshold_str = normalized
-        .value
-        .clone()
-        .unwrap_or_else(|| "0".to_string());
-    let threshold: i64 = threshold_str.parse().map_err(|_| {
-        anyhow!("Valeur de comparaison invalide: {}", threshold_str)
-    })?;
+    let threshold_str = normalized.value.clone().unwrap_or_else(|| "0".to_string());
+    let threshold: i64 = threshold_str
+        .parse()
+        .map_err(|_| anyhow!("Valeur de comparaison invalide: {}", threshold_str))?;
 
     let raw_result = match normalized.operator {
         ConditionOperator::Equals => file_count == threshold,
@@ -225,11 +210,7 @@ fn evaluate_file_count(
     })
 }
 
-fn collect_matches(
-    base_path: &Path,
-    pattern: &str,
-    scope: ConditionScope,
-) -> Result<Vec<PathBuf>> {
+fn collect_matches(base_path: &Path, pattern: &str, scope: ConditionScope) -> Result<Vec<PathBuf>> {
     let normalized_pattern = pattern.replace('\\', "/");
     let has_wildcards = normalized_pattern.contains('*') || normalized_pattern.contains('?');
 
@@ -264,7 +245,10 @@ fn collect_matches(
             }
             continue;
         }
-        let rel = entry.path().strip_prefix(base_path).map_err(|err| anyhow!(err))?;
+        let rel = entry
+            .path()
+            .strip_prefix(base_path)
+            .map_err(|err| anyhow!(err))?;
         let rel_str = path_to_forward_string(rel);
         if regex.is_match(&rel_str) {
             matches.push(entry.into_path());
@@ -333,7 +317,11 @@ fn depth_hint(pattern: &str) -> usize {
     if cleaned.is_empty() {
         1
     } else {
-        cleaned.split('/').filter(|segment| !segment.is_empty()).count().max(1)
+        cleaned
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .count()
+            .max(1)
     }
 }
 
@@ -356,9 +344,7 @@ fn is_operator_allowed(selector: ConditionSelector, operator: ConditionOperator)
     match selector {
         ConditionSelector::CurrentFolderName => matches!(
             operator,
-            ConditionOperator::Equals
-                | ConditionOperator::Contains
-                | ConditionOperator::Regex
+            ConditionOperator::Equals | ConditionOperator::Contains | ConditionOperator::Regex
         ),
         ConditionSelector::FileSearch => matches!(
             operator,
@@ -399,11 +385,19 @@ fn operator_symbol(operator: ConditionOperator) -> &'static str {
 }
 
 fn truth_label(result: bool) -> &'static str {
-    if result { "vrai" } else { "faux" }
+    if result {
+        "vrai"
+    } else {
+        "faux"
+    }
 }
 
 fn negate_suffix(negate: bool) -> &'static str {
-    if negate { " (inversion)" } else { "" }
+    if negate {
+        " (inversion)"
+    } else {
+        ""
+    }
 }
 
 fn normalize_optional_string(value: &Option<String>) -> Option<String> {
@@ -414,7 +408,11 @@ fn normalize_optional_string(value: &Option<String>) -> Option<String> {
 }
 
 fn apply_negate(value: bool, negate: bool) -> bool {
-    if negate { !value } else { value }
+    if negate {
+        !value
+    } else {
+        value
+    }
 }
 
 fn build_regex(pattern: &str) -> Result<Regex> {

@@ -66,12 +66,10 @@ pub fn save_workflow(
 
 fn read_stored_workflow(id: &str) -> Result<StoredWorkflow> {
     let file_path = workflow_file_path(id)?;
-    let content = fs::read_to_string(&file_path).with_context(|| {
-        format!("Impossible d'ouvrir le workflow sauvegardé {}", id)
-    })?;
-    let stored: StoredWorkflow = serde_json::from_str(&content).with_context(|| {
-        format!("Impossible de parser le workflow sauvegardé {}", id)
-    })?;
+    let content = fs::read_to_string(&file_path)
+        .with_context(|| format!("Impossible d'ouvrir le workflow sauvegardé {}", id))?;
+    let stored: StoredWorkflow = serde_json::from_str(&content)
+        .with_context(|| format!("Impossible de parser le workflow sauvegardé {}", id))?;
     Ok(stored)
 }
 

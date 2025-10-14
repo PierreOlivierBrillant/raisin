@@ -88,7 +88,9 @@ const ExecSchema = BaseOperationSchema.extend({
   kind: z.literal("exec"),
   command: z.string().min(1),
   args: z.array(z.string()).default([]),
-  shell: z.enum(["default", "powershell", "bash", "zsh"]).default("default"),
+  shell: z
+    .enum(["default", "powershell", "bash", "zsh", "fish"])
+    .default("default"),
   cwd: PathFragmentSchema.optional(),
   env: z.record(z.string(), z.string()).optional(),
 });
@@ -245,6 +247,17 @@ export interface CommandeurExecutionResult {
   warnings: CommandeurValidationMessage[];
   errors: CommandeurValidationMessage[];
   outputArchivePath?: string;
+}
+
+export type CommandeurExecutionStatus =
+  | "idle"
+  | "running"
+  | "paused"
+  | "stopping";
+
+export interface CommandeurExecutionProgress {
+  operationsProcessed: number;
+  operationsTotal: number;
 }
 
 export interface CommandeurSavedWorkflowSummary {

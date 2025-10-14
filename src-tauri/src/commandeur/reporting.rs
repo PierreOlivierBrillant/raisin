@@ -50,12 +50,7 @@ pub fn push_log(
     level: ValidationLevel,
     message: impl Into<String>,
 ) -> CommandeurExecutionLogEntry {
-    let entry = CommandeurExecutionLogEntry::new(
-        operation.id(),
-        operation.label(),
-        level,
-        message,
-    );
+    let entry = CommandeurExecutionLogEntry::new(operation.id(), operation.label(), level, message);
     entries.push(entry.clone());
     entry
 }
@@ -67,12 +62,7 @@ pub fn push_log_with_meta(
     level: ValidationLevel,
     message: impl Into<String>,
 ) -> CommandeurExecutionLogEntry {
-    let entry = CommandeurExecutionLogEntry::new(
-        operation_id,
-        operation_label,
-        level,
-        message,
-    );
+    let entry = CommandeurExecutionLogEntry::new(operation_id, operation_label, level, message);
     entries.push(entry.clone());
     entry
 }

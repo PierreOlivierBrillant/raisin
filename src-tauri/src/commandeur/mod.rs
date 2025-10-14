@@ -1,10 +1,11 @@
-mod errors;
 mod conditions;
+mod errors;
 mod execution;
+mod execution_control;
 mod models;
 mod python;
-mod saved_workflows;
 mod reporting;
+mod saved_workflows;
 mod storage;
 mod utils;
 mod validation;
@@ -13,8 +14,14 @@ mod workspace;
 pub use workspace::AppState;
 
 use execution::execute_workflow;
-use models::{CommandeurExecutionResult, CommandeurValidationMessage, CommandeurWorkflow, SavedWorkflowSummary};
-use saved_workflows::{delete_workflow, duplicate_workflow, list_workflows, load_workflow, save_workflow};
+use execution_control::ExecutionStatus;
+use models::{
+    CommandeurExecutionResult, CommandeurValidationMessage, CommandeurWorkflow,
+    SavedWorkflowSummary,
+};
+use saved_workflows::{
+    delete_workflow, duplicate_workflow, list_workflows, load_workflow, save_workflow,
+};
 use validation::validate_workflow;
 use workspace::{prepare_workspace, CommandeurWorkspaceSummary};
 
@@ -44,21 +51,67 @@ pub async fn commandeur_execute_workflow(
     workspace_id: String,
     workflow: CommandeurWorkflow,
 ) -> Result<CommandeurExecutionResult, String> {
+    let control = state.register_execution().map_err(|err| err.to_string())?;
     let state_clone = state.inner().clone();
+    let state_for_execution = state_clone.clone();
     let workflow_clone = workflow.clone();
     let window_clone = window.clone();
+    let workspace_id_clone = workspace_id.clone();
+    let control_for_execution = control.clone();
 
-    spawn_blocking(move || {
+    let result = spawn_blocking(move || {
         execute_workflow(
-            &state_clone,
+            &state_for_execution,
             Some(&window_clone),
-            workspace_id.as_str(),
+            workspace_id_clone.as_str(),
             &workflow_clone,
+            control_for_execution,
         )
     })
     .await
     .map_err(|err| err.to_string())?
-    .map_err(|err| err.to_string())
+    .map_err(|err| err.to_string());
+
+    if let Err(err) = state_clone.clear_execution() {
+        eprintln!(
+            "[commandeur_execute_workflow] unable to clear execution: {}",
+            err
+        );
+    }
+
+    result
+}
+
+#[tauri::command]
+pub fn commandeur_execution_pause(state: State<AppState>) -> Result<ExecutionStatus, String> {
+    state
+        .with_execution(|session| {
+            session.control.request_pause();
+            Ok(session.control.status())
+        })
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn commandeur_execution_resume(state: State<AppState>) -> Result<ExecutionStatus, String> {
+    state
+        .with_execution(|session| {
+            session.control.request_resume();
+            Ok(session.control.status())
+        })
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn commandeur_execution_stop(state: State<AppState>) -> Result<ExecutionStatus, String> {
+    state
+        .with_execution(|session| {
+            session
+                .control
+                .request_stop(Some("Arrêt manuel demandé".to_string()));
+            Ok(session.control.status())
+        })
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]

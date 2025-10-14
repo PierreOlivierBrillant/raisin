@@ -11,9 +11,8 @@ const LOGS_FOLDER: &str = "logs";
 const WORKFLOWS_FOLDER: &str = "workflows";
 
 fn base_dir() -> Result<PathBuf> {
-    let mut dir = config_dir().unwrap_or_else(|| {
-        env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-    });
+    let mut dir =
+        config_dir().unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     dir.push(APP_FOLDER);
     dir.push(MODULE_FOLDER);
     fs::create_dir_all(&dir)?;

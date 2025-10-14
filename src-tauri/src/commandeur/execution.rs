@@ -9,6 +9,7 @@ use tauri::Window;
 
 use crate::commandeur::conditions::evaluate_condition_for_folder;
 use crate::commandeur::errors::CommandeurError;
+use crate::commandeur::execution_control::{ExecutionControl, ExecutionInterrupt, ExecutionStatus};
 use crate::commandeur::models::{
     CommandeurExecutionLogEntry, CommandeurExecutionResult, CommandeurOperation,
     CommandeurValidationMessage, CommandeurWorkflow, OperationDetails, PythonEntry, ReplaceMode,
@@ -26,6 +27,14 @@ use crate::commandeur::workspace::{
 
 const LOG_EVENT: &str = "commandeur://execution-log";
 const VALIDATION_EVENT: &str = "commandeur://execution-validation";
+const PROGRESS_EVENT: &str = "commandeur://execution-progress";
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExecutionProgressPayload {
+    operations_processed: usize,
+    operations_total: usize,
+}
 
 fn emit_event<T: Serialize>(window: Option<&Window>, name: &str, payload: &T) {
     if let Some(win) = window {
@@ -38,6 +47,7 @@ pub fn execute_workflow(
     window: Option<&Window>,
     workspace_id: &str,
     workflow: &CommandeurWorkflow,
+    control: ExecutionControl,
 ) -> Result<CommandeurExecutionResult> {
     let workspace_arc = state.get_workspace(workspace_id)?;
     let workspace = workspace_arc
@@ -49,6 +59,20 @@ pub fn execute_workflow(
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
     let mut operations_run = 0usize;
+    let mut interrupted_reason: Option<String> = None;
+
+    let enabled_operation_count = workflow.operations.iter().filter(|op| op.enabled()).count();
+    let folder_count = workspace.sub_folders.len();
+    let total_operations = enabled_operation_count.saturating_mul(folder_count);
+    let mut operations_processed = 0usize;
+
+    if total_operations > 0 {
+        let payload = ExecutionProgressPayload {
+            operations_processed: 0,
+            operations_total: total_operations,
+        };
+        emit_event(window, PROGRESS_EVENT, &payload);
+    }
 
     let workflow_banner = if let Some(version) = &workflow.version {
         format!(
@@ -58,11 +82,14 @@ pub fn execute_workflow(
     } else {
         format!("Démarrage du workflow \"{}\"", workflow.name)
     };
-    let start_entry =
-        push_workspace_log(&mut log_entries, ValidationLevel::Info, workflow_banner);
+    let start_entry = push_workspace_log(&mut log_entries, ValidationLevel::Info, workflow_banner);
     emit_event(window, LOG_EVENT, &start_entry);
 
     'folder_loop: for folder in &workspace.sub_folders {
+        if let Err(interrupt) = control.checkpoint() {
+            interrupted_reason = Some(interrupt.reason);
+            break;
+        }
         let base_path = workspace.folder_absolute_path(folder);
         if !base_path.exists() {
             let missing_entry = push_workspace_log(
@@ -89,16 +116,33 @@ pub fn execute_workflow(
                 continue;
             }
 
-            match execute_operation_for_folder(
+            if let Err(interrupt) = control.checkpoint() {
+                interrupted_reason = Some(interrupt.reason);
+                break 'folder_loop;
+            }
+
+            let operation_result = execute_operation_for_folder(
                 &workspace,
                 operation,
                 folder,
                 &base_path,
                 window,
+                Some(&control),
                 &mut env,
                 &mut log_entries,
                 &mut warnings,
-            ) {
+            );
+
+            operations_processed = operations_processed.saturating_add(1);
+            if total_operations > 0 {
+                let payload = ExecutionProgressPayload {
+                    operations_processed,
+                    operations_total: total_operations,
+                };
+                emit_event(window, PROGRESS_EVENT, &payload);
+            }
+
+            match operation_result {
                 Ok(()) => {
                     operations_run += 1;
                 }
@@ -141,8 +185,15 @@ pub fn execute_workflow(
                         emit_event(window, LOG_EVENT, &entry);
                         break 'folder_loop;
                     }
+                    CommandeurError::ExecutionInterrupted { reason } => {
+                        interrupted_reason = Some(reason);
+                        break 'folder_loop;
+                    }
                 },
             }
+        }
+        if interrupted_reason.is_some() {
+            break;
         }
     }
 
@@ -155,8 +206,20 @@ pub fn execute_workflow(
 
     let log_path_string = log_file_path.to_string_lossy().to_string();
 
+    if let Some(reason) = interrupted_reason.as_ref() {
+        let status = control.status();
+        if status == ExecutionStatus::Stopping {
+            let entry = push_workspace_log(
+                &mut log_entries,
+                ValidationLevel::Warning,
+                format!("Exécution interrompue · {reason}"),
+            );
+            emit_event(window, LOG_EVENT, &entry);
+        }
+    }
+
     Ok(CommandeurExecutionResult {
-        success: errors.is_empty(),
+        success: errors.is_empty() && interrupted_reason.is_none(),
         operations_run,
         log_file_path: log_path_string,
         log_entries,
@@ -172,18 +235,27 @@ fn execute_operation_for_folder(
     folder: &str,
     base_path: &Path,
     window: Option<&Window>,
+    control: Option<&ExecutionControl>,
     env: &mut ExecutionEnv,
     log_entries: &mut Vec<CommandeurExecutionLogEntry>,
     warnings: &mut Vec<CommandeurValidationMessage>,
 ) -> Result<(), CommandeurError> {
+    if let Some(ctrl) = control {
+        ctrl.checkpoint().map_err(|ExecutionInterrupt { reason }| {
+            CommandeurError::ExecutionInterrupted { reason }
+        })?;
+    }
     if let Some(comment) = operation.comment() {
-        let entry = push_log(
-            log_entries,
-            operation,
-            ValidationLevel::Info,
-            format!("[{folder}] Note: {comment}"),
-        );
-        emit_event(window, LOG_EVENT, &entry);
+        let trimmed = comment.trim();
+        if !trimmed.is_empty() {
+            let entry = push_log(
+                log_entries,
+                operation,
+                ValidationLevel::Info,
+                format!("[{folder}] Note: {trimmed}"),
+            );
+            emit_event(window, LOG_EVENT, &entry);
+        }
     }
 
     match &operation.details {
@@ -331,8 +403,10 @@ fn execute_operation_for_folder(
                 .output()
                 .map_err(|err| operation_failed(operation, err))?;
             if !output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout_raw = String::from_utf8_lossy(&output.stdout);
+                let stderr_raw = String::from_utf8_lossy(&output.stderr);
+                let stdout = sanitize_output(&stdout_raw);
+                let stderr = sanitize_output(&stderr_raw);
                 return Err(operation_failed(
                     operation,
                     anyhow!(
@@ -571,8 +645,10 @@ fn execute_operation_for_folder(
                 .map_err(|err| operation_failed(operation, err))?;
             drop(temp_holder);
             if !output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout_raw = String::from_utf8_lossy(&output.stdout);
+                let stderr_raw = String::from_utf8_lossy(&output.stderr);
+                let stdout = sanitize_output(&stdout_raw);
+                let stderr = sanitize_output(&stderr_raw);
                 return Err(operation_failed(
                     operation,
                     anyhow!(
@@ -614,6 +690,7 @@ fn execute_operation_for_folder(
                     folder,
                     base_path,
                     window,
+                    control,
                     env,
                     log_entries,
                     warnings,
@@ -689,6 +766,16 @@ fn build_command(
             cmd.arg("-lc").arg(script);
             Ok(cmd)
         }
+        ShellKind::Fish => {
+            let mut cmd = Command::new("fish");
+            let script = if args.is_empty() {
+                command.to_string()
+            } else {
+                format!("{} {}", command, join_shell_args(args))
+            };
+            cmd.arg("-lc").arg(script);
+            Ok(cmd)
+        }
     }
 }
 
@@ -722,6 +809,23 @@ fn join_powershell(command: &str, args: &[String]) -> String {
         }
     }
     parts.join(" ")
+}
+
+fn sanitize_output(input: &str) -> String {
+    let normalized = input.replace("\r\n", "\n").replace('\r', "\n");
+    let cleaned: String = normalized
+        .chars()
+        .filter(|&c| match c {
+            '\n' | '\t' => true,
+            _ if c == '\u{fffd}' => false,
+            _ => !c.is_control(),
+        })
+        .collect();
+    if cleaned.chars().any(|c| !c.is_whitespace()) {
+        cleaned
+    } else {
+        String::new()
+    }
 }
 
 fn operation_failed(
