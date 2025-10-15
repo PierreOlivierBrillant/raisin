@@ -11,15 +11,19 @@ const hasLocalCli = existsSync(localCli);
 const command = hasLocalCli
   ? localCli
   : process.platform === "win32"
-  ? "npx.cmd"
-  : "npx";
-const commandArgs = hasLocalCli ? tauriArgs : ["tauri", ...tauriArgs];
+  ? "cmd.exe"
+  : "tauri";
+const commandArgs = hasLocalCli
+  ? tauriArgs
+  : process.platform === "win32"
+  ? ["/d", "/s", "/c", "npx tauri", ...tauriArgs]
+  : tauriArgs;
 
 // linuxdeploy's bundled strip binary fails on RELR sections, so export NO_STRIP to bypass it.
 const child = spawn(command, commandArgs, {
   env: { ...process.env, NO_STRIP: "1" },
   stdio: "inherit",
-  shell: !hasLocalCli && process.platform === "win32",
+  shell: false,
 });
 
 child.on("exit", (code, signal) => {
