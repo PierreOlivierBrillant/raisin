@@ -37,7 +37,8 @@ console.log(
 const child = spawn(command, commandArgs, {
   env: { ...process.env, NO_STRIP: "1" },
   stdio: "inherit",
-  shell: false,
+  windowsVerbatimArguments: true,
+  shell: process.platform === "win32",
 });
 
 child.on("exit", (code, signal) => {
