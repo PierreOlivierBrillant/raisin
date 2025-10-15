@@ -1,5 +1,5 @@
 import React from "react";
-import { Download, Upload } from "lucide-react";
+import { Download, Upload, Plus } from "lucide-react";
 import { templateToolbarStyles } from "./TemplateToolbar.styles";
 import type { PresetKey } from "../TemplatePresets";
 import reactLogo from "../../../assets/react.svg";
@@ -19,15 +19,24 @@ interface TemplateToolbarProps {
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onAddPreset: (key: PresetKey) => void;
+  onAddRoot: () => void;
 }
 
 export const TemplateToolbar: React.FC<TemplateToolbarProps> = ({
   onExport,
   onImport,
   onAddPreset,
+  onAddRoot,
 }) => {
   return (
     <div style={templateToolbarStyles.container}>
+      <button
+        onClick={onAddRoot}
+        className="btn btn-secondary btn-compact"
+        title="Ajouter une nouvelle racine"
+      >
+        <Plus size={14} /> Ajouter une racine
+      </button>
       <button
         onClick={onExport}
         className="btn btn-success btn-compact"

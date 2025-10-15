@@ -1,7 +1,11 @@
 // Définitions de presets d'arborescences pour différents frameworks / stacks.
 // Chaque preset est une liste de chemins (relatifs à la racine) avec leur type.
 import type { HierarchyTemplate, FileNode } from "../../types";
-import { createNode, createDefaultTemplate } from "./TemplateEditor.logic";
+import {
+  createNode,
+  createDefaultTemplate,
+  ensureRootInvariant,
+} from "./TemplateEditor.logic";
 
 export type PresetKey =
   | "react"
@@ -34,8 +38,6 @@ const reactPreset: PresetEntry[] = [
 const angularPreset: PresetEntry[] = [
   { path: "src", type: "directory" },
   { path: "src/app", type: "directory" },
-  { path: "src/app/app.component.ts", type: "file" },
-  { path: "src/app/app.module.ts", type: "file" },
   { path: "angular.json", type: "file" },
   { path: "package.json", type: "file" },
   { path: "tsconfig.json", type: "file" },
@@ -51,12 +53,7 @@ const vuePreset: PresetEntry[] = [
   { path: "vite.config.ts", type: "file" },
 ];
 
-const dotnetPreset: PresetEntry[] = [
-  { path: "*", type: "directory" },
-  { path: "*/Program.cs", type: "file" },
-  { path: "*/*.csproj", type: "file" },
-  { path: "*.sln", type: "file" },
-];
+const dotnetPreset: PresetEntry[] = [{ path: "*.sln", type: "file" }];
 
 const mavenPreset: PresetEntry[] = [
   { path: "pom.xml", type: "file" },
@@ -70,16 +67,11 @@ const mavenPreset: PresetEntry[] = [
 ];
 
 const gradlePreset: PresetEntry[] = [
-  { path: "settings.gradle", type: "file" },
-  { path: "build.gradle", type: "file" },
-  { path: "gradle.properties", type: "file" },
+  { path: "settings.gradle*", type: "file" },
+  { path: "build.gradle*", type: "file" },
   { path: "src", type: "directory" },
   { path: "src/main", type: "directory" },
-  { path: "src/main/java", type: "directory" },
-  { path: "src/main/resources", type: "directory" },
-  { path: "src/test", type: "directory" },
-  { path: "src/test/java", type: "directory" },
-  { path: "src/test/resources", type: "directory" },
+  { path: "src/main/*", type: "directory" },
 ];
 
 // Flutter typical project layout
@@ -159,6 +151,21 @@ const PRESETS: Record<PresetKey, PresetEntry[]> = {
   springboot: springbootPreset,
 };
 
+const PRESET_ROOT_LABELS: Record<PresetKey, string> = {
+  react: "React",
+  angular: "Angular",
+  vue: "Vue",
+  dotnet: ".NET",
+  maven: "Maven",
+  gradle: "Gradle",
+  flutter: "Flutter",
+  android: "Android",
+  laravel: "Laravel",
+  django: "Django",
+  rails: "Rails",
+  springboot: "Spring Boot",
+};
+
 /**
  * Construit un NOUVEAU template à partir d'un preset (remplacement total de l'arbre sauf racine).
  * Utile pour basculer rapidement entre frameworks (reset complet).
@@ -213,12 +220,26 @@ export function buildPresetTemplate(key: PresetKey): HierarchyTemplate {
     }
   }
   // Adapter nom / meta
-  return {
+  const displayName = PRESET_ROOT_LABELS[key] ?? `Preset ${key}`;
+  if (rootId && work.nodes[rootId]) {
+    work = {
+      ...work,
+      nodes: {
+        ...work.nodes,
+        [rootId]: {
+          ...work.nodes[rootId],
+          name: displayName,
+          path: displayName,
+        },
+      },
+    };
+  }
+  return ensureRootInvariant({
     ...work,
     id: `preset-${key}`,
     name: `Preset ${key}`,
     description: `Arborescence ${key}`,
-  };
+  });
 }
 
 /**

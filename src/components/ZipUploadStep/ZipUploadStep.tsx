@@ -1,12 +1,13 @@
 import React, { useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import type { HierarchyTemplate } from "../../types";
 import { zipUploadStyles } from "./ZipUploadStep.styles";
 import { zipUploadExtraStyles } from "./ZipUploadStep.extra.styles";
+import type { ZipSource } from "../../types/zip";
 
 interface ZipUploadStepProps {
   template: HierarchyTemplate | null;
-  onZipChosen: (file: File) => void;
+  onZipChosen: (source: ZipSource) => void;
   onNext?: () => void;
   disabled?: boolean; // future use
 }
@@ -17,19 +18,22 @@ export const ZipUploadStep: React.FC<ZipUploadStepProps> = ({
   onNext,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [zipFile, setZipFile] = useState<File | null>(null);
+  const [selectedSource, setSelectedSource] = useState<ZipSource | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f || !template) return;
-    setZipFile(f);
-    onZipChosen(f);
+    const source: ZipSource = { kind: "file", file: f, label: f.name };
+    setSelectedSource(source);
+    onZipChosen(source);
   };
+
+  const selectionLabel = selectedSource?.label;
 
   return (
     <div className="card" style={zipUploadStyles.card as React.CSSProperties}>
       <div style={zipUploadStyles.uploadZone}>
-        <Upload size={48} color="#9ca3af" />
+        <FolderOpen size={48} color="#9ca3af" />
         <p style={zipUploadStyles.uploadHint}>
           Glissez-déposez votre fichier ZIP ici ou cliquez pour sélectionner
         </p>
@@ -45,17 +49,17 @@ export const ZipUploadStep: React.FC<ZipUploadStepProps> = ({
             onClick={() => fileInputRef.current?.click()}
             className="btn btn-primary"
           >
-            {zipFile ? "Changer de fichier" : "Sélectionner un fichier"}
+            {selectionLabel ? "Changer de fichier" : "Sélectionner un fichier"}
           </button>
-          {zipFile && (
+          {selectedSource && (
             <button className="btn btn-secondary" onClick={onNext}>
               Étape suivante
             </button>
           )}
         </div>
-        {zipFile && (
+        {selectionLabel && (
           <p style={zipUploadExtraStyles.selectedFile}>
-            Fichier sélectionné : <strong>{zipFile.name}</strong>
+            Source sélectionnée : <strong>{selectionLabel}</strong>
           </p>
         )}
       </div>

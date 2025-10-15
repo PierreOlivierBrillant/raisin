@@ -1,49 +1,137 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { flushSync } from "react-dom"; // Assure l'application immédiate de l'état avant navigation
-import type { HierarchyTemplate, StudentFolder } from "../../types";
-import { analyzeZipStructureMock } from "../../services/analyzeZip";
+import type { HierarchyTemplate, RootAnalysisResult } from "../../types";
+import { analyzeZipStructure } from "../../services/analyzeZip";
 import { ZipFolderPicker } from "../ZipFolderPicker/ZipFolderPicker";
 import { paramsStyles } from "./ParamsStep.styles";
+import type { ZipSource } from "../../types/zip";
+import { extractTemplateForRoot } from "../TemplateEditor/TemplateEditor.logic";
 
 interface ParamsStepProps {
   template: HierarchyTemplate | null;
-  zipFile: File | null;
-  onAnalysisComplete: (results: StudentFolder[]) => void;
+  zipSource: ZipSource | null;
+  onAnalysisComplete: (results: RootAnalysisResult[]) => void;
   onNext?: () => void;
   setIsProcessing: (p: boolean) => void;
   isProcessing: boolean;
 }
 
+interface RootSettings {
+  studentRootPath: string;
+  projectsPerStudent: number;
+  similarityThreshold: number;
+}
+
+const DEFAULT_SETTINGS: RootSettings = {
+  studentRootPath: "",
+  projectsPerStudent: 1,
+  similarityThreshold: 90,
+};
+
 export const ParamsStep: React.FC<ParamsStepProps> = ({
   template,
-  zipFile,
+  zipSource,
   onAnalysisComplete,
   onNext,
   setIsProcessing,
   isProcessing,
 }) => {
-  const [studentRootPath, setStudentRootPath] = useState("");
-  const [projectsPerStudent, setProjectsPerStudent] = useState(1);
-  const [similarityThreshold, setSimilarityThreshold] = useState(90);
-  // Plus de modal : le sélecteur est inline directement
+  const [settingsByRoot, setSettingsByRoot] = useState<
+    Record<string, RootSettings>
+  >({});
+  const [activeRootId, setActiveRootId] = useState<string | null>(null);
 
-  const start = async () => {
-    if (!zipFile || !template) return;
-    if (projectsPerStudent <= 0) {
-      alert("Le nombre de projets par étudiant doit être supérieur à 0.");
+  useEffect(() => {
+    if (!template || template.rootNodes.length === 0) {
+      setSettingsByRoot({});
+      setActiveRootId(null);
       return;
     }
+    setSettingsByRoot((prev) => {
+      const next: Record<string, RootSettings> = {};
+      template.rootNodes.forEach((rootId) => {
+        next[rootId] = prev[rootId]
+          ? { ...prev[rootId] }
+          : { ...DEFAULT_SETTINGS };
+      });
+      return next;
+    });
+    if (!activeRootId || !template.rootNodes.includes(activeRootId)) {
+      setActiveRootId(template.rootNodes[0]);
+    }
+  }, [template, activeRootId]);
+
+  useEffect(() => {
+    if (!zipSource) return;
+    setSettingsByRoot((prev) => {
+      const next: Record<string, RootSettings> = {};
+      for (const [rootId, settings] of Object.entries(prev)) {
+        next[rootId] = { ...settings, studentRootPath: "" };
+      }
+      return next;
+    });
+  }, [zipSource]);
+
+  const updateSettings = (rootId: string, patch: Partial<RootSettings>) => {
+    setSettingsByRoot((prev) => {
+      const base = prev[rootId] ?? { ...DEFAULT_SETTINGS };
+      return {
+        ...prev,
+        [rootId]: { ...base, ...patch },
+      };
+    });
+  };
+
+  const updateCurrentSettings = (patch: Partial<RootSettings>) => {
+    if (!activeRootId) return;
+    updateSettings(activeRootId, patch);
+  };
+
+  const roots = template?.rootNodes ?? [];
+  const activeRootNode = activeRootId
+    ? template?.nodes[activeRootId] ?? null
+    : null;
+  const currentSettings =
+    activeRootId && settingsByRoot[activeRootId]
+      ? settingsByRoot[activeRootId]
+      : { ...DEFAULT_SETTINGS };
+
+  const start = async () => {
+    if (!zipSource || !template || roots.length === 0) return;
+
+    for (const rootId of roots) {
+      const settings = settingsByRoot[rootId] ?? { ...DEFAULT_SETTINGS };
+      if (settings.projectsPerStudent <= 0) {
+        const rootName = template.nodes[rootId]?.name ?? "Racine";
+        alert(
+          `Le nombre de projets par étudiant doit être supérieur à 0 pour la racine "${rootName}".`
+        );
+        return;
+      }
+    }
+
     setIsProcessing(true);
     try {
-      const results = await analyzeZipStructureMock({
-        template,
-        zipFile,
-        studentRootPath,
-        projectsPerStudent,
-        similarityThreshold,
-      });
+      const aggregated: RootAnalysisResult[] = [];
+      for (const rootId of roots) {
+        const subset = extractTemplateForRoot(template, rootId);
+        if (!subset) continue;
+        const settings = settingsByRoot[rootId] ?? { ...DEFAULT_SETTINGS };
+        const folders = await analyzeZipStructure({
+          template: subset,
+          zipSource,
+          studentRootPath: settings.studentRootPath,
+          projectsPerStudent: settings.projectsPerStudent,
+          similarityThreshold: settings.similarityThreshold,
+        });
+        aggregated.push({
+          rootId,
+          rootName: subset.nodes[rootId]?.name ?? "Racine",
+          folders,
+        });
+      }
       flushSync(() => {
-        onAnalysisComplete(results);
+        onAnalysisComplete(aggregated);
       });
       onNext?.();
     } finally {
@@ -56,6 +144,26 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
       <h3 style={{ margin: "0 0 .75rem", fontSize: "1rem" }}>
         Paramètres d'analyse
       </h3>
+      {roots.length > 1 && (
+        <div style={paramsStyles.rootTabs}>
+          {roots.map((rootId) => {
+            const node = template?.nodes[rootId];
+            if (!node) return null;
+            const isActive = rootId === activeRootId;
+            return (
+              <button
+                key={rootId}
+                className={`btn btn-compact ${
+                  isActive ? "btn-primary" : "btn-secondary"
+                }`}
+                onClick={() => setActiveRootId(rootId)}
+              >
+                {node.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <form
         style={paramsStyles.form}
         onSubmit={(e) => {
@@ -65,14 +173,17 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
       >
         <div style={{ display: "flex", flexDirection: "column", gap: ".6rem" }}>
           <label style={paramsStyles.label}>
-            Dossier contenant les dossiers étudiants (sélectionnez dans
-            l'arborescence)
+            Dossier contenant les dossiers étudiants pour{" "}
+            <strong>{activeRootNode?.name ?? "Racine"}</strong>
           </label>
-          {zipFile ? (
+          {zipSource ? (
             <ZipFolderPicker
-              zipFile={zipFile}
+              zipSource={zipSource}
               inline
-              onSelect={(folderPath) => setStudentRootPath(folderPath)}
+              selectedPath={currentSettings.studentRootPath}
+              onSelect={(folderPath) =>
+                updateCurrentSettings({ studentRootPath: folderPath })
+              }
             />
           ) : (
             <div style={paramsStyles.hint}>
@@ -89,8 +200,12 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
             <input
               type="number"
               min={1}
-              value={projectsPerStudent}
-              onChange={(e) => setProjectsPerStudent(Number(e.target.value))}
+              value={currentSettings.projectsPerStudent}
+              onChange={(e) =>
+                updateCurrentSettings({
+                  projectsPerStudent: Number(e.target.value),
+                })
+              }
               style={paramsStyles.input}
             />
           </div>
@@ -100,8 +215,12 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
               type="number"
               min={0}
               max={100}
-              value={similarityThreshold}
-              onChange={(e) => setSimilarityThreshold(Number(e.target.value))}
+              value={currentSettings.similarityThreshold}
+              onChange={(e) =>
+                updateCurrentSettings({
+                  similarityThreshold: Number(e.target.value),
+                })
+              }
               style={paramsStyles.input}
             />
           </div>
@@ -110,7 +229,7 @@ export const ParamsStep: React.FC<ParamsStepProps> = ({
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={isProcessing}
+            disabled={isProcessing || !zipSource}
           >
             Lancer l'analyse
           </button>

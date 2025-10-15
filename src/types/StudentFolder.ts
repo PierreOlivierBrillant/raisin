@@ -18,6 +18,8 @@ export interface StudentProject {
   newPath: string;
   // Indique si l'utilisateur a modifié manuellement le chemin (newPath != suggestedNewPath)
   isRenamed?: boolean;
+  // Signal qu'un projet a été gardé même si le score est sous le seuil requis.
+  isBelowThreshold?: boolean;
 }
 
 // Dossier analysé pour un étudiant donné.

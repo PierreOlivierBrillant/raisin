@@ -1,31 +1,35 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { zipFolderPickerStyles as s } from "./ZipFolderPicker.styles";
 import { zipFolderPickerExtraStyles as xs } from "./ZipFolderPicker.extra.styles";
 import { useZipTree } from "../../hooks/useZipTree";
 import type { ZipTreeNode } from "../../hooks/useZipTree";
+import type { ZipSource } from "../../types/zip";
 import { ZipBreadcrumb } from "./ZipBreadcrumb/ZipBreadcrumb";
 import { ZipTreeView } from "./ZipTreeView/ZipTreeView";
 
 interface ZipFolderPickerProps {
-  zipFile: File;
+  zipSource: ZipSource;
   /** Callback appelée quand l'utilisateur sélectionne un dossier. */
   onSelect: (folderPath: string) => void;
   title?: string;
   inline?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
+  /** Chemin sélectionné à mettre en avant (optionnel). */
+  selectedPath?: string;
 }
 
 /** Sélecteur d'un dossier racine dans une archive ZIP analysée. */
 export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
-  zipFile,
+  zipSource,
   onSelect,
   title = "Sélection du dossier racine",
   inline = false,
   isOpen = true,
   onClose,
+  selectedPath,
 }) => {
-  const { tree, status, error } = useZipTree(zipFile);
+  const { tree, status, error } = useZipTree(zipSource);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([""]));
   const [activePath, setActivePath] = useState<string>("");
   const [hasFocus, setHasFocus] = useState(false);
@@ -62,6 +66,23 @@ export const ZipFolderPicker: React.FC<ZipFolderPickerProps> = ({
     walk(tree);
     return list;
   }, [tree, expanded]);
+
+  useEffect(() => {
+    if (selectedPath === undefined) return;
+    setActivePath(selectedPath);
+    if (!selectedPath) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.add("");
+      const segments = selectedPath.split("/").filter(Boolean);
+      let current = "";
+      for (const segment of segments) {
+        current = current ? `${current}/${segment}` : segment;
+        next.add(current);
+      }
+      return next;
+    });
+  }, [selectedPath]);
 
   if (!inline && !isOpen) return null;
 

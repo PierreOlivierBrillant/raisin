@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Raisin Dev
+Comment=Raisin (mode développement)
+Exec=/ABSOLUTE/PATH/TO/PROJECT/src-tauri/target/debug/app
+Icon=raisin
+Terminal=false
+Categories=Development;
+StartupWMClass=raisin

@@ -1,4 +1,25 @@
 export const resultsStyles = {
+  groupsContainer: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "1.1rem",
+  },
+  groupSection: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: ".75rem",
+  },
+  groupHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: ".75rem",
+  },
+  groupTitle: {
+    margin: 0,
+    fontSize: "1rem",
+    fontWeight: 600,
+  },
   headerRow: {
     display: "flex",
     justifyContent: "space-between",
@@ -9,7 +30,7 @@ export const resultsStyles = {
   studentList: {
     display: "flex",
     flexDirection: "column" as const,
-    gap: "1rem",
+    gap: ".6rem",
   },
   studentCard: {
     border: "1px solid #e5e7eb",
@@ -50,5 +71,12 @@ export const resultsStyles = {
     alignItems: "center",
     gap: ".35rem",
     fontSize: ".75rem",
+  },
+  emptyGroup: {
+    padding: ".9rem 1rem",
+    background: "#f9fafb",
+    borderRadius: ".5rem",
+    color: "#6b7280",
+    fontSize: ".85rem",
   },
 };

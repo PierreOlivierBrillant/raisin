@@ -8,21 +8,28 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test": "vitest run",
     "prebuild": "npm run lint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@tauri-apps/api": "^1.6.0",
     "d3": "^7.9.0",
     "file-saver": "^2.0.5",
+    "js-yaml": "^4.1.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.544.0",
-    "js-yaml": "^4.1.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@tauri-apps/cli": "^1.6.0",
     "@types/d3": "^7.4.3",
+    "@types/node": "^24.7.2",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
@@ -32,6 +39,7 @@
     "globals": "^16.3.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.1",
-    "vite": "^7.1.2"
+    "vite": "^7.1.2",
+    "vitest": "^2.1.5"
   }
 }

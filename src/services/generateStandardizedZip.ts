@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import type { StudentFolder } from "../types";
+import type { StudentFolder, StudentProject } from "../types";
 
 /**
  * Génère une archive standardisée où chaque projet détecté est recopié
@@ -25,6 +25,7 @@ export async function generateStandardizedZip(
   }
 
   const virtualFiles: VirtualFileRef[] = [];
+  const virtualFilesByPath = new Map<string, VirtualFileRef>();
 
   async function expand(zip: JSZip, prefix: string) {
     const tasks: Promise<void>[] = [];
@@ -50,13 +51,200 @@ export async function generateStandardizedZip(
             await expand(nested, virtualRoot);
           } else {
             const virtualPath = [prefix, normalized].filter(Boolean).join("/");
-            virtualFiles.push({ path: virtualPath, file: entry });
+            const ref: VirtualFileRef = { path: virtualPath, file: entry };
+            virtualFiles.push(ref);
+            virtualFilesByPath.set(virtualPath, ref);
           }
         })()
       );
     });
     await Promise.all(tasks);
   }
+
+  const normalizeZipSegments = (path: string) =>
+    path
+      .split("/")
+      .map((segment) => segment.replace(/\.zip$/i, ""))
+      .join("/");
+
+  const normalizePath = (raw?: string | null): string | undefined => {
+    if (raw == null) return undefined;
+    if (raw === "") return "";
+    return raw.replace(/\/+$/g, "");
+  };
+
+  const parentDir = (path: string): string => {
+    if (!path) return "";
+    const idx = path.lastIndexOf("/");
+    return idx >= 0 ? path.slice(0, idx) : "";
+  };
+
+  const computeLca = (paths: string[]): string => {
+    if (!paths.length) return "";
+    const segmentsList = paths.map((p) => (p ? p.split("/") : []));
+    let index = 0;
+    while (true) {
+      const segment = segmentsList[0][index];
+      if (segment === undefined) break;
+      if (segmentsList.some((arr) => arr[index] !== segment)) break;
+      index++;
+    }
+    if (!index) return "";
+    return segmentsList[0].slice(0, index).join("/");
+  };
+
+  const deriveEffectiveRoot = (
+    project: StudentProject,
+    baseRoot: string
+  ): string => {
+    const normalizedBase = normalizePath(baseRoot) ?? "";
+    const matches = project.templateMatches ?? [];
+    const candidateDirs: string[] = [];
+
+    for (const match of matches) {
+      if (!match.foundPath) continue;
+      const normalizedMatch = normalizePath(match.foundPath);
+      if (normalizedMatch === undefined) continue;
+      if (
+        normalizedBase &&
+        !normalizedMatch.startsWith(normalizedBase) &&
+        !normalizedBase.startsWith(normalizedMatch)
+      ) {
+        continue;
+      }
+      if (normalizedMatch && virtualFilesByPath.has(normalizedMatch)) {
+        const parent = parentDir(normalizedMatch);
+        candidateDirs.push(parent);
+      } else if (normalizedMatch) {
+        candidateDirs.push(normalizedMatch);
+      }
+    }
+
+    if (!candidateDirs.length) return normalizedBase;
+    const filtered = candidateDirs.filter((p) =>
+      normalizedBase
+        ? p.startsWith(normalizedBase) || normalizedBase.startsWith(p)
+        : true
+    );
+    const source = filtered.length ? filtered : candidateDirs;
+    const lca = computeLca(source);
+    if (!lca) return normalizedBase;
+    if (normalizedBase && !lca.startsWith(normalizedBase)) {
+      if (normalizedBase.startsWith(lca)) return lca;
+      return normalizedBase;
+    }
+    return lca;
+  };
+
+  const buildCandidateRoots = (
+    primary?: string,
+    secondary?: string,
+    extras: string[] = []
+  ) => {
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+
+    const addCandidate = (value: string | undefined) => {
+      if (value === undefined) return;
+      if (seen.has(value)) return;
+      seen.add(value);
+      ordered.push(value);
+    };
+
+    const addWithZipVariants = (raw?: string) => {
+      const normalized = normalizePath(raw);
+      if (normalized === undefined) return;
+      addCandidate(normalized);
+      if (!normalized) return;
+      if (normalized.toLowerCase().includes(".zip")) {
+        const segmentsVariant = normalizeZipSegments(normalized);
+        if (segmentsVariant && segmentsVariant !== normalized) {
+          addCandidate(segmentsVariant);
+        }
+        const trimmed = normalized.replace(
+          /\.zip(\/|$)/gi,
+          (_match, suffix) => suffix || ""
+        );
+        if (trimmed && trimmed !== normalized) {
+          addCandidate(trimmed);
+        }
+      }
+    };
+
+    addWithZipVariants(primary);
+    if (secondary !== primary) addWithZipVariants(secondary);
+    for (const extra of extras) {
+      addWithZipVariants(extra);
+    }
+    return ordered;
+  };
+
+  const collectRelatedCandidate = (raw: string) => {
+    const target = normalizePath(raw) ?? "";
+    if (!target) {
+      return virtualFiles.slice();
+    }
+    const prefix = `${target}/`;
+    return virtualFiles.filter(
+      (vf) => vf.path === target || vf.path.startsWith(prefix)
+    );
+  };
+
+  const projectVirtualCache = new WeakMap<
+    StudentProject,
+    { related: VirtualFileRef[]; effectiveRoot: string }
+  >();
+
+  const ensureProjectFiles = (project: StudentProject) => {
+    const cached = projectVirtualCache.get(project);
+    if (cached) return cached;
+    const baseRoot = normalizePath(project.projectRootPath) ?? "";
+    const matchParents = new Set<string>();
+    for (const match of project.templateMatches ?? []) {
+      if (!match.foundPath) continue;
+      const normalizedMatch = normalizePath(match.foundPath);
+      if (normalizedMatch === undefined) continue;
+      matchParents.add(parentDir(normalizedMatch));
+    }
+    const resolvedRoot = deriveEffectiveRoot(project, baseRoot);
+    const candidates = buildCandidateRoots(
+      resolvedRoot,
+      baseRoot,
+      Array.from(matchParents)
+    );
+    let related: VirtualFileRef[] = [];
+    let matchedRoot: string | undefined;
+    for (const candidate of candidates) {
+      related = collectRelatedCandidate(candidate);
+      if (related.length) {
+        matchedRoot = candidate;
+        break;
+      }
+    }
+    if (!related.length && baseRoot && !candidates.includes(baseRoot)) {
+      const fallbackRelated = collectRelatedCandidate(baseRoot);
+      if (fallbackRelated.length) {
+        related = fallbackRelated;
+        matchedRoot = baseRoot;
+      }
+    }
+    if (related.length === 1) {
+      const sole = related[0];
+      const parent = parentDir(sole.path);
+      if (parent) {
+        const siblings = collectRelatedCandidate(parent);
+        if (siblings.length > related.length) {
+          related = siblings;
+          matchedRoot = parent;
+        }
+      }
+    }
+    const effectiveRoot =
+      matchedRoot ?? (candidates.length ? candidates[0] : baseRoot);
+    const computed = { related, effectiveRoot };
+    projectVirtualCache.set(project, computed);
+    return computed;
+  };
 
   await expand(rootZip, "");
 
@@ -69,32 +257,19 @@ export async function generateStandardizedZip(
         cancelled = true;
         break;
       }
-      const root = project.projectRootPath.replace(/\/$/, "");
-      if (!root) continue;
       const dstRoot = project.newPath.trim();
       if (!dstRoot) continue;
-      function collectRelated(r: string) {
-        const rp = r + "/";
-        return virtualFiles.filter(
-          (vf) => vf.path === r || vf.path.startsWith(rp)
-        );
-      }
-      let related = collectRelated(root);
-      // Fallback: si le chemin inclut .zip (cas où analyse aurait stocké avec extension)
-      if (related.length === 0 && /\.zip$/i.test(root)) {
-        const alt = root.replace(/\.zip$/i, "");
-        related = collectRelated(alt);
-      }
-      // Si toujours rien, ignorer
+      const { related, effectiveRoot } = ensureProjectFiles(project);
       if (related.length === 0) continue;
-      const effectiveRoot = related[0].path.startsWith(root)
-        ? root
-        : root.replace(/\.zip$/i, "");
-      const rootPrefix = effectiveRoot + "/";
+      const rootPrefix = effectiveRoot ? `${effectiveRoot}/` : "";
       const filePaths: string[] = [];
       for (const vf of related) {
         const relative =
-          vf.path === effectiveRoot ? "" : vf.path.slice(rootPrefix.length);
+          vf.path === effectiveRoot
+            ? ""
+            : rootPrefix
+            ? vf.path.slice(rootPrefix.length)
+            : vf.path;
         filePaths.push(relative ? `${dstRoot}/${relative}` : dstRoot);
       }
       projectRoots.push({ dstRoot, paths: filePaths });
@@ -117,29 +292,20 @@ export async function generateStandardizedZip(
       }
       const dstRoot = project.newPath.trim();
       if (!dstRoot) continue;
-      const root = project.projectRootPath.replace(/\/$/, "");
-      function collectRelated(r: string) {
-        const rp = r + "/";
-        return virtualFiles.filter(
-          (vf) => vf.path === r || vf.path.startsWith(rp)
-        );
-      }
-      let related = collectRelated(root);
-      if (related.length === 0 && /\.zip$/i.test(root)) {
-        related = collectRelated(root.replace(/\.zip$/i, ""));
-      }
+      const { related, effectiveRoot } = ensureProjectFiles(project);
       if (related.length === 0) continue;
-      const effectiveRoot = related[0].path.startsWith(root)
-        ? root
-        : root.replace(/\.zip$/i, "");
-      const rootPrefix = effectiveRoot + "/";
+      const rootPrefix = effectiveRoot ? `${effectiveRoot}/` : "";
       for (const vf of related) {
         if (isCancelled?.()) {
           cancelled = true;
           break;
         }
         const relative =
-          vf.path === effectiveRoot ? "" : vf.path.slice(rootPrefix.length);
+          vf.path === effectiveRoot
+            ? ""
+            : rootPrefix
+            ? vf.path.slice(rootPrefix.length)
+            : vf.path;
         const dest = relative ? `${dstRoot}/${relative}` : dstRoot;
         const content = await vf.file.async("arraybuffer");
         outZip.file(dest, content);

@@ -8,11 +8,16 @@ import type { HierarchyTemplate, StudentFolder } from "../../types";
 import "../../styles/layout.css";
 import { useStepperState } from "../../hooks/useStepperState";
 import { raisinStyles } from "./Raisin.styles";
+import type { ZipSource } from "../../types/zip";
 
-export const Raisin: React.FC = () => {
+interface RaisinProps {
+  onBack?: () => void;
+}
+
+export const Raisin: React.FC<RaisinProps> = ({ onBack }) => {
   const [currentTemplate, setCurrentTemplate] =
     useState<HierarchyTemplate | null>(null);
-  const [uploadedZip, setUploadedZip] = useState<File | null>(null);
+  const [uploadedZip, setUploadedZip] = useState<ZipSource | null>(null);
   const [analysisResults, setAnalysisResults] = useState<StudentFolder[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { current: currentStep, goTo: internalGoTo } = useStepperState<
@@ -88,7 +93,14 @@ export const Raisin: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-header" style={{ position: "relative" }}>
+        {onBack && (
+          <div style={{ position: "absolute", left: 16, top: 12 }}>
+            <button className="btn" onClick={onBack}>
+              &larr; Accueil
+            </button>
+          </div>
+        )}
         <h1>Raisin 🍇</h1>
         <h2>Standardisateur de dossiers ZIP</h2>
       </header>
@@ -127,11 +139,8 @@ export const Raisin: React.FC = () => {
             <ZipUploadStep
               template={currentTemplate}
               onZipChosen={(file) => {
-                if (!file.name.toLowerCase().endsWith(".zip")) {
-                  alert("Fichier invalide : une archive .zip est requise");
-                  return;
-                }
                 setUploadedZip(file);
+                setAnalysisResults([]);
               }}
               onNext={() => goTo(2)}
             />
@@ -139,7 +148,7 @@ export const Raisin: React.FC = () => {
           {currentStep === 2 && (
             <ParamsStep
               template={currentTemplate}
-              zipFile={uploadedZip}
+              zipSource={uploadedZip}
               onAnalysisComplete={setAnalysisResults}
               onNext={() => goTo(3)}
               setIsProcessing={setIsProcessing}
@@ -150,7 +159,7 @@ export const Raisin: React.FC = () => {
             <ResultsStep
               template={currentTemplate}
               analysisResults={analysisResults}
-              zipFile={uploadedZip!}
+              zipSource={uploadedZip!}
               onResultsChange={(upd) => setAnalysisResults(upd)}
             />
           )}

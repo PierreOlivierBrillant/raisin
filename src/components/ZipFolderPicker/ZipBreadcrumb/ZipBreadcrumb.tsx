@@ -14,13 +14,17 @@ export const ZipBreadcrumb: React.FC<ZipBreadcrumbProps> = ({
   const paths = segments.map((_, idx) => segments.slice(0, idx + 1).join("/"));
   return (
     <nav className="breadcrumb">
-      <button onClick={() => onNavigate("")} className="link">
+      <button type="button" onClick={() => onNavigate("")} className="link">
         Racine
       </button>
       {segments.map((seg, i) => (
         <React.Fragment key={paths[i]}>
           <span className="sep">/</span>
-          <button onClick={() => onNavigate(paths[i])} className="link">
+          <button
+            type="button"
+            onClick={() => onNavigate(paths[i])}
+            className="link"
+          >
             {seg}
           </button>
         </React.Fragment>

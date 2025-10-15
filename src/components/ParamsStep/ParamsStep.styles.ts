@@ -35,6 +35,12 @@ export const paramsStyles = {
     gap: ".75rem",
     flexWrap: "wrap" as const,
   },
+  rootTabs: {
+    display: "flex",
+    gap: ".4rem",
+    flexWrap: "wrap" as const,
+    marginBottom: ".5rem",
+  },
   overlay: {
     position: "absolute" as const,
     inset: 0,

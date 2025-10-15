@@ -8,6 +8,8 @@ interface ModalProps {
   width?: string;
   /** Hauteur maximale. */
   maxHeight?: string;
+  /** Padding interne appliqué au conteneur. */
+  padding?: string;
   /** Libellé ARIA du dialogue. */
   ariaLabel?: string;
 }
@@ -18,6 +20,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   width = "min(640px,90%)",
   maxHeight = "80vh",
+  padding = "1.25rem",
   ariaLabel,
 }) => {
   return (
@@ -33,6 +36,7 @@ export const Modal: React.FC<ModalProps> = ({
           ...modalStyles.container,
           width,
           maxHeight,
+          padding,
         }}
         onClick={(e) => e.stopPropagation()}
       >
