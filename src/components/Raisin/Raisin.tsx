@@ -18,8 +18,9 @@ export const Raisin: React.FC<RaisinProps> = ({ onBack }) => {
   const [currentTemplate, setCurrentTemplate] =
     useState<HierarchyTemplate | null>(null);
   const [uploadedZip, setUploadedZip] = useState<ZipSource | null>(null);
-  const [analysisResults, setAnalysisResults] =
-    useState<RootAnalysisResult[]>([]);
+  const [analysisResults, setAnalysisResults] = useState<RootAnalysisResult[]>(
+    []
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const { current: currentStep, goTo: internalGoTo } = useStepperState<
     0 | 1 | 2 | 3

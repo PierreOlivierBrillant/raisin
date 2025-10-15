@@ -1,72 +1,57 @@
-# Raisin – Guide d’utilisation rapide
+# Raisin
 
-Raisin vous permet de :
+## Présentation rapide
 
-1. Définir un modèle (structure de dossiers/fichiers attendue)
-2. Analyser une archive ZIP contenant des remises d'étudiants
-3. Voir un score de correspondance par projet
-4. Ajuster les chemins proposés
-5. Générer une archive ZIP « standardisée »
+- Analyse des remises étudiantes contenues dans une archive ZIP et évaluation face à un modèle cible.
+- Ajustement manuel des chemins proposés avant la génération d’un ZIP « standardisé ».
+- Version desktop (Tauri) incluant l’espace **Commandeur** pour exécuter des workflows automatisés sur un workspace local.
 
-Pour un guide détaillé utilisateur : voir `README.user.md` (version longue avec FAQ et exemples).
+### Téléchargements (builds GitHub Actions)
 
----
+- Windows (.msi) : [tauri-windows-latest](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-windows-latest.zip)
+- macOS (.dmg/.app) : [tauri-macos-latest](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-macos-latest.zip)
+- Linux (AppImage/deb) : [tauri-ubuntu-22.04](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-ubuntu-22.04.zip)
 
-## Parcours en 4 étapes
+### Parcours express
 
-1. Construire le modèle (Étape "Modèle")
-2. Importer le ZIP (Étape "ZIP")
-3. Lancer l’analyse (Étape "Paramètres")
-4. Examiner les résultats (Étape "Résultats")
+1. **Modèle** : créez ou importez votre structure attendue (YAML export/import).
+2. **ZIP** : chargez l’archive contenant les dossiers étudiants.
+3. **Paramètres** : choisissez le dossier racine, le nombre de projets et lancez l’analyse.
+4. **Résultats** : consultez les scores (≥95 % vert, 90–94 % orange, <90 % rouge), corrigez les chemins et générez `standardized.zip`.
 
-### Aperçu visuel
+### Conseils clés
 
-| Étape         | Capture                                                  |
-| ------------- | -------------------------------------------------------- |
-| 1. Modèle     | ![Éditeur du modèle](docs/screenshots/modele.png)        |
-| 2. Import ZIP | ![Import du ZIP](docs/screenshots/import-zip.png)        |
-| 3. Paramètres | ![Paramètres d'analyse](docs/screenshots/parametres.png) |
-| 4. Résultats  | ![Résultats et scores](docs/screenshots/resultats.png)   |
+- Sauvegardez vos modèles via l’export YAML pour les réutiliser.
+- Corrigez les chemins avant la génération pour normaliser les noms de projets.
+- Les détails projet affichent les éléments correspondant ou manquants du modèle.
+- L’espace Commandeur exécute des workflows YAML avec logs, mises en pause et gestion des erreurs.
 
 ---
 
-## Comprendre les scores
+## Environnement de développement
 
-| Couleur | Signification                 |
-| ------- | ----------------------------- |
-| Vert    | ≥ 95% : quasi conforme        |
-| Orange  | 90–94% : divergences mineures |
-| Rouge   | < 90% : structure incomplète  |
+### Prérequis
 
----
+- Node.js 20 (géré par `actions/setup-node` en CI).
+- Rust toolchain stable (`cargo`, `rustup`).
+- Pour Linux : `libgtk-3-dev`, `libayatana-appindicator3-dev`, `webkit2gtk-4.0`, `libwebkit2gtk-4.0-dev`, `libssl-dev`, `libappindicator3-dev`, `librsvg2-dev`.
 
-## Astuces rapides
+### Installation
 
-| Besoin                        | Action                               |
-| ----------------------------- | ------------------------------------ |
-| Sauvegarder un modèle         | Export YAML                          |
-| Repartir d’un modèle existant | Import YAML                          |
-| Améliorer un score faible     | Vérifier dossiers/fichiers manquants |
-| Normaliser un nom de projet   | Modifier le chemin avant génération  |
+```bash
+npm ci
+```
 
----
+### Commandes utiles
 
-## Fichier généré
+- `npm run dev` : interface web via Vite.
+- `npm run tauri:dev` : application desktop (Tauri) avec auto-reload.
+- `npm run lint` / `npm run lint:fix` : analyse et correction ESLint.
+- `npm run test` : tests Vitest.
+- `npm run tauri:build` : génère les exécutables desktop.
 
-Le fichier produit porte le nom par défaut `standardized.zip` et contient les dossiers renommés selon le modèle.
+### Notes de projet
 
----
-
-## Commandeur (desktop)
-
-La version desktop inclut un espace **Commandeur** qui accompagne désormais le parcours suivant :
-
-1. Préparer un workspace à partir d'un dossier ou d'une archive ZIP locale.
-2. Importer un workflow YAML, obtenir les messages de validation et corriger les avertissements éventuels.
-3. Exécuter le workflow avec suivi des logs, avertissements et erreurs consolidés.
-
-Les opérations sont orchestrées via l'API Tauri pour accéder au système de fichiers local en respectant l'allowlist de sécurité.
-
----
-
-Bon usage de Raisin 🍇
+- Frontend : React 19 + Vite, styles CSS modulaires, validation avec Zod.
+- Backend desktop : Tauri (Rust) pour l’accès disque, workflows Commandeur et génération d’archives.
+- CI : workflow `Build Tauri Binaries` (GitHub Actions) produit les exécutables listés plus haut.
