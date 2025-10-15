@@ -23,7 +23,6 @@ pub struct NormalizedConditionTest {
 pub struct ConditionEvaluation {
     pub result: bool,
     pub summary: String,
-    pub folder_count: Option<(usize, usize)>,
 }
 
 pub fn normalize_condition(test: &ConditionTest) -> NormalizedConditionTest {
@@ -130,7 +129,6 @@ fn evaluate_current_folder(
     Ok(ConditionEvaluation {
         result: final_result,
         summary,
-        folder_count: None,
     })
 }
 
@@ -163,7 +161,6 @@ fn evaluate_file_search(
     Ok(ConditionEvaluation {
         result: final_result,
         summary,
-        folder_count: None,
     })
 }
 
@@ -206,7 +203,6 @@ fn evaluate_file_count(
     Ok(ConditionEvaluation {
         result: final_result,
         summary,
-        folder_count: None,
     })
 }
 
