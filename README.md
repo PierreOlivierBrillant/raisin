@@ -8,9 +8,10 @@
 
 ### Téléchargements (builds GitHub Actions)
 
-- Windows (.msi) : [tauri-windows-latest](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-windows-latest.zip)
-- macOS (.dmg/.app) : [tauri-macos-latest](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-macos-latest.zip)
-- Linux (AppImage/deb) : [tauri-ubuntu-22.04](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-ubuntu-22.04.zip)
+- Windows (.msi) : [tauri-windows](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-windows.zip)
+- macOS Apple Silicon (.dmg/.app) : [tauri-macos-aarch64](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-macos-aarch64.zip)
+- macOS Intel (.dmg/.app) : [tauri-macos-x86_64](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-macos-x86_64.zip)
+- Linux (AppImage/deb) : [tauri-linux](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-linux.zip)
 
 ### Parcours express
 
