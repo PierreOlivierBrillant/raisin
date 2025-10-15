@@ -8,16 +8,30 @@ const tauriArgs = userArgs.length > 0 ? userArgs : ["build"];
 const binName = process.platform === "win32" ? "tauri.cmd" : "tauri";
 const localCli = resolve(process.cwd(), "node_modules", ".bin", binName);
 const hasLocalCli = existsSync(localCli);
-const command = hasLocalCli
-  ? localCli
-  : process.platform === "win32"
-  ? "cmd.exe"
-  : "tauri";
-const commandArgs = hasLocalCli
-  ? tauriArgs
-  : process.platform === "win32"
-  ? ["/d", "/s", "/c", "npx tauri", ...tauriArgs]
-  : tauriArgs;
+const command = hasLocalCli ? localCli : undefined;
+const commandArgs = hasLocalCli ? tauriArgs : [];
+
+if (!hasLocalCli) {
+  console.error("Tauri CLI introuvable dans node_modules/.bin");
+  console.error(
+    "Variables pertinentes :",
+    JSON.stringify({
+      platform: process.platform,
+      cwd: process.cwd(),
+      binPath: localCli,
+      pathEnv: process.env.PATH,
+    })
+  );
+  process.exit(1);
+}
+
+console.log(
+  "Exécution du CLI local",
+  JSON.stringify({
+    command,
+    args: commandArgs,
+  })
+);
 
 // linuxdeploy's bundled strip binary fails on RELR sections, so export NO_STRIP to bypass it.
 const child = spawn(command, commandArgs, {
