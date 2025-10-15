@@ -4,7 +4,7 @@ import { ParamsStep } from "../ParamsStep/ParamsStep";
 import { ResultsStep } from "../ResultsStep/ResultsStep";
 import { TemplateEditor } from "../TemplateEditor/TemplateEditor";
 import { Stepper } from "../Stepper/Stepper";
-import type { HierarchyTemplate, StudentFolder } from "../../types";
+import type { HierarchyTemplate, RootAnalysisResult } from "../../types";
 import "../../styles/layout.css";
 import { useStepperState } from "../../hooks/useStepperState";
 import { raisinStyles } from "./Raisin.styles";
@@ -18,7 +18,8 @@ export const Raisin: React.FC<RaisinProps> = ({ onBack }) => {
   const [currentTemplate, setCurrentTemplate] =
     useState<HierarchyTemplate | null>(null);
   const [uploadedZip, setUploadedZip] = useState<ZipSource | null>(null);
-  const [analysisResults, setAnalysisResults] = useState<StudentFolder[]>([]);
+  const [analysisResults, setAnalysisResults] =
+    useState<RootAnalysisResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { current: currentStep, goTo: internalGoTo } = useStepperState<
     0 | 1 | 2 | 3
