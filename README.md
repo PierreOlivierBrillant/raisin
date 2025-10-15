@@ -12,7 +12,7 @@
 - macOS Apple Silicon (.dmg/.app) : [tauri-macos-aarch64](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-macos-aarch64.zip)
 - macOS Intel (.dmg/.app) : [tauri-macos-x86_64](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-macos-x86_64.zip)
 - Linux (AppImage/deb) : [tauri-linux](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-linux.zip)
- - Arch Linux (AppImage) : [tauri-archlinux](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-archlinux.zip)
+- Arch Linux (AppImage) : [tauri-archlinux](https://nightly.link/PierreOlivierBrillant/raisin/workflows/tauri-build.yml/main/tauri-archlinux.zip)
 
 ### Parcours express
 
