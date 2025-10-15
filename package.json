@@ -11,6 +11,7 @@
     "test": "vitest run",
     "prebuild": "npm run lint",
     "preview": "vite preview",
+    "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },
