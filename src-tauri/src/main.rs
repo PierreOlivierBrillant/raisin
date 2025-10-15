@@ -113,6 +113,7 @@ fn collect_zip_entries<R: Read + std::io::Seek>(
                     {
                         eprintln!("[collect_zip_entries] expanding nested zip {:?}", full_path);
                     }
+                    #[cfg(debug_assertions)]
                     let before = entries.len();
                     if let Err(err) =
                         collect_zip_entries(&mut nested, &nested_prefix, entries, added)
