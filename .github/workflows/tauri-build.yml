@@ -34,6 +34,10 @@ jobs:
             args: ""
             bundlePath: src-tauri/target/release/bundle/**
             artifactName: tauri-windows
+          - platform: archlinux_latest
+            args: ""
+            bundlePath: src-tauri/target/release/bundle/**
+            artifactName: tauri-archlinux
     runs-on: ${{ matrix.platform }}
 
     steps:
@@ -69,6 +73,12 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             patchelf
+
+      - name: Install Arch Linux dependencies
+        if: matrix.platform == 'archlinux_latest'
+        run: |
+          sudo pacman -Syu --noconfirm
+          sudo pacman -S --noconfirm webkit2gtk libappindicator librsvg patchelf
 
       - name: Build Tauri bundle
         uses: tauri-apps/tauri-action@v0
